@@ -29,9 +29,14 @@ add_executable(ksend src/ksend.cpp)
 target_link_libraries(ksend PUBLIC Qt6::Core Qt6::Network proxy)
 
 
-##### KListen
+##### KRead
 ########################################################
 add_executable(kread src/kread.cpp)
 target_link_libraries(kread PUBLIC Qt6::Core Qt6::Network Qt6::StateMachine proxy)
+
+##### KGroups
+########################################################
+add_executable(kgroups src/kgroups.cpp)
+target_link_libraries(kgroups PUBLIC Qt6::Core Qt6::Network Qt6::StateMachine proxy)
 
 

@@ -182,5 +182,3 @@ int main(int argc, char** argv) {
     startInitializion(v3);
     return app.exec();
 }
-
-

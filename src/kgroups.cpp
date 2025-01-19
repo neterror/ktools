@@ -4,34 +4,51 @@
 #include <qjsondocument.h>
 #include "kafka_proxy_v3.h"
 
-
-void sendProtobufData(KafkaProxyV3& v3, const QString& topic, const QString& key, const QString& fileName) {
-    QFile f(fileName);
-    if (!f.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open" << fileName;
-        QCoreApplication::quit();
-        return;
+void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
+    QString formattedRow;
+    for (int i = 0; i < row.size(); ++i) {
+        formattedRow += QString("%1").arg(row[i], -columnWidths[i]);
     }
-    auto doc = QJsonDocument::fromJson(f.readAll());
-    v3.sendProtobufData(topic, key, doc);
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug().noquote() << "error: " << msg;
-        } else {
-            qDebug().noquote() << "Success. Data sent";
-        }
-        QCoreApplication::quit();
-    });
+    qDebug().noquote() << formattedRow; // Prevent additional quotes in QDebug output
 }
+
 
 void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplication& app) {
     parser.process(app);
-    if (parser.isSet("topic") && parser.isSet("json")) {
-        sendProtobufData(v3, parser.value("topic"), parser.value("key"), parser.value("json"));
+    if (parser.isSet("groups")) {
+        printTableRow({"GroupID", "State"}, {30, 10});
+        qDebug().noquote() << "----------------------------------------";
+        QObject::connect(&v3, &KafkaProxyV3::groups, [](auto groups){
+            for (const auto& group: groups) {
+                printTableRow({group.name, group.state}, {30, 10});
+            }
+            QCoreApplication::quit();
+        });
+        v3.listGroups();
         return;
     }
+
+    if (parser.isSet("consumers")) {
+        printTableRow({"GroupID", "ConsumerID", "ClientID"}, {30, 40, 40});
+        qDebug().noquote() << "----------------------------------------";
+        QObject::connect(&v3, &KafkaProxyV3::consumers, [](auto result){
+            for (const auto& consumer: result) {
+                qDebug().noquote() << "groupId:    " << consumer.groupId;
+                qDebug().noquote() << "consumerId: " << consumer.consumerId;
+                qDebug().noquote() << "clientId:   " << consumer.clientId;
+                qDebug().noquote() << "-------------------------------------";
+            }
+            QCoreApplication::quit();
+        });
+
+        v3.getGroupConsumers(parser.value("consumers"));
+        return;
+    }
+
+    //no command to process""
     parser.showHelp();
 }
+
 
 void startInitializion(KafkaProxyV3& v3) {
     QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg){
@@ -45,6 +62,7 @@ void startInitializion(KafkaProxyV3& v3) {
     v3.getClusterId();
 }
 
+
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
@@ -54,9 +72,8 @@ int main(int argc, char** argv) {
 
     parser.addHelpOption();
     parser.addOptions({
-            {"topic", "topic on which to send data", "send-topic"},
-            {"key",   "kafka topic key", "topic-key"},
-            {"json", "send json data", "json-file"}
+            {"groups", "list the groups"},
+            {"consumers", "list the groups", "group"},
     });
 
     QSettings settings;

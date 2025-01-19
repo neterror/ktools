@@ -13,7 +13,7 @@ QJsonArray KafkaProxyV3::getDataArray(QRestReply& reply, QString& errorMsg) {
 
     auto json = reply.readJson();
     if (!json || !((*json)["data"].isArray())) {
-        errorMsg = "Unexpected JSON reply in GetClusterID";
+        errorMsg = "Unexpected JSON reply. Missing data";
         return {};
     }
     auto result = (*json)["data"].toArray();
@@ -176,3 +176,51 @@ void KafkaProxyV3::sendProtobufData(const QString& topic, const QString& key, co
         }
     });
 }
+
+
+void KafkaProxyV3::listGroups() {
+    auto url = QString("v3/clusters/%1/consumer-groups").arg(mClusterID);
+    mRest.get(requestV3(url), this, [this](QRestReply& reply){
+        QString errorMsg;
+        auto data = getDataArray(reply, errorMsg);
+        if (!errorMsg.isEmpty()) {
+            emit ready(false, errorMsg);
+            return;
+        }
+
+        QList<Group> result;
+        for(const auto& item: data) {
+            auto obj = item.toObject();
+            result.append({
+                    obj["consumer_group_id"].toString(),
+                    obj["state"].toString()
+                });
+        }
+        emit groups(result);
+    });
+}
+
+
+void KafkaProxyV3::getGroupConsumers(const QString& group) {
+    auto url = QString("v3/clusters/%1/consumer-groups/%2/consumers").arg(mClusterID).arg(group);
+    mRest.get(requestV3(url), this, [this](QRestReply& reply){
+        QString errorMsg;
+        auto data = getDataArray(reply, errorMsg);
+        if (!errorMsg.isEmpty()) {
+            emit ready(false, errorMsg);
+            return;
+        }
+
+        QList<Consumer> result;
+        for(const auto& item: data) {
+            auto obj = item.toObject();
+            result.append({
+                    obj["consumer_group_id"].toString(),
+                    obj["consumer_id"].toString(),
+                    obj["client_id"].toString(),
+                });
+        }
+        emit consumers(result);
+    });
+}
+        
