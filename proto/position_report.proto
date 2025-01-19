@@ -1,0 +1,10 @@
+syntax="proto3";
+option java_package = "com.abrites.common";
+
+message PositionReport
+{
+    double lat = 2;
+    double lng = 3;
+    double alt = 4;
+    double speed = 5;
+}
