@@ -9,6 +9,8 @@ add_library(proxy STATIC
   kafka_proxy_v3.h
   schema_registry.cpp
   schema_registry.h
+  schema_utils.cpp
+  schema_utils.h
 )
 
 target_include_directories(proxy PUBLIC ${CMAKE_CURRENT_LIST_DIR})

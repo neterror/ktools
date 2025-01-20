@@ -102,13 +102,18 @@ bool SchemaRegistry::registerProtobuf(const QString& subject,
 
 void SchemaRegistry::deleteSchema(const QString& subject, qint32 version) {
     QString url = QString("subjects/%1/versions/%2").arg(subject).arg(version);
-    auto reply = mRest.deleteResource(requestV3(url), this, [this](QRestReply &reply) {
-        bool success = true;
-        if (reply.error() != QNetworkReply::NoError) {
-            qDebug() << "error: " << reply.error() << reply.errorString();
-            success = false;
+    auto reply = mRest.deleteResource(requestV3(url), this, [this,subject,version](QRestReply &reply) {
+        auto json = reply.readJson();
+        if (json || json->isObject()) {
+            auto obj = json->object();
+            if (obj.contains("error_code")) {
+                qWarning() << "schema deletion failed:" << obj["message"].toString();
+                emit schemaDeleted(false, subject, version);
+                return;
+            }
         }
-        emit ready(success);
+
+        emit schemaDeleted(true, subject, version);
     });
 }
 

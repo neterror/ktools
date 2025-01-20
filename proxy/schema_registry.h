@@ -31,4 +31,5 @@ public:
     void deleteSchema(const QString& subject, qint32 version);
 signals:
     void registeredSchemas(QList<Schema> schemas);
+    void schemaDeleted(bool success, QString subject, qint32 version);
 };

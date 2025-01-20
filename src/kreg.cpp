@@ -1,4 +1,5 @@
 #include "schema_registry.h"
+#include "schema_utils.h"
 #include <QtCore>
 #include <qcommandlineoption.h>
 #include <qcoreapplication.h>
@@ -78,14 +79,21 @@ void listSchemas(SchemaRegistry& registry) {
     registry.getSchemas();
 }
 
-void deleteSchema(SchemaRegistry& registry, const QString& subject, qint32 version) {
-    registry.deleteSchema(subject, version);
-    QObject::connect(&registry, &SchemaRegistry::ready, [subject](bool success){
+void deleteSchemaId(SchemaUtils& schemaUtils, qint32 schemaId) {
+    QObject::connect(&schemaUtils, &SchemaUtils::error, [](QString message){
+        qWarning().noquote() << message;
+        QCoreApplication::quit();
+    });
+
+    QObject::connect(&schemaUtils, &SchemaUtils::deleted, [target=schemaId](bool success, qint32 schemaId, QString subject, qint32 version){
         if (success) {
-            qDebug().noquote() << subject << "deleted";
+            qDebug().noquote() << "deleted schemaId" << schemaId << "subject" << subject << "version" << version;
+        } else {
+            qWarning().noquote() << "failed to delete" << target;
         }
         QCoreApplication::quit();
     });
+    schemaUtils.deleteSchemaId(schemaId);
 }
 
 int main(int argc, char** argv) {
@@ -103,8 +111,7 @@ int main(int argc, char** argv) {
             {"ref-subject", "The protobuf reference of the newly registered", "reference subject"},
             {"ref-version", "The protobuf reference version", "version"},
 
-            {"delete-subject", "delete schema subject", "subject"},
-            {"delete-version", "delete schema subject", "version"},
+            {"delete", "delete schema Id", "schemaId"},
             {"list", "list registered schemas"},
     });
     parser.process(app);
@@ -115,6 +122,7 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentSchemaRegistry/password").toString();
 
     SchemaRegistry registry(server, user, password);
+    SchemaUtils schemaUtils(registry);
 
 
     bool processed = false;
@@ -130,14 +138,9 @@ int main(int argc, char** argv) {
         processed = true;
     }
 
-    if (!processed && parser.isSet("delete-subject")) {
-        if (!parser.isSet("delete-version")) {
-            qCritical() << "subject version is required ";
-        } else {
-            auto version = parser.value("delete-version").toInt();
-            deleteSchema(registry, parser.value("delete-subject"), version);
-            processed = true;
-        }
+    if (!processed && parser.isSet("delete")) {
+        deleteSchemaId(schemaUtils, parser.value("delete").toInt());
+        processed = true;
     }
 
 
