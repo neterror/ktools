@@ -28,6 +28,7 @@ public:
     void getOffset(const QString& group, const QString& topic);
 
 signals:
+    void obtainedInstanceId(QString intanceId);
     void subscribed(QString topics);
     void finished(QString message);
     void received(Message message);

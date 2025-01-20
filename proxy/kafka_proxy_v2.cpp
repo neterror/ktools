@@ -24,14 +24,14 @@ void KafkaProxyV2::requestInstanceId(const QString& groupName) {
     mRest.post(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
         auto json = reply.readJson();
         if (!json || !json->isObject()) {
-            emit ready(false, "Failed to obtain instanceId");
+            emit failed("Failed to obtain instanceId");
             return;
         }
         
         auto obj = json->object();
         if (obj.contains("instance_id")) {
             mInstanceId = obj["instance_id"].toString();
-            emit ready(true);
+            emit obtainedInstanceId(mInstanceId);
         } else {
             emit failed(obj["message"].toString());
         }

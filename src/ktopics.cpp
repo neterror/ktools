@@ -3,6 +3,7 @@
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
 #include "kafka_proxy_v3.h"
+#include "topics_delete.h"
 
 void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
     QString formattedRow;
@@ -14,22 +15,16 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 
 
 void listTopics(KafkaProxyV3& v3) {
-    QObject::connect(&v3, &KafkaProxyV3::topics, [](QList<KafkaProxyV3::Topic> topics){
+    QObject::connect(&v3, &KafkaProxyV3::topicList, [](QList<KafkaProxyV3::Topic> topics){
         auto columns = QList<int>{30};
         printTableRow({"Topic"}, columns);
         qDebug().noquote() << "----------------------------------------";
         for (const auto& topic: topics) {
             printTableRow({topic.name}, columns);
         }
-    });
-
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug() << msg;
-        }
         QCoreApplication::quit();
     });
-        
+
     v3.listTopics();
 }
 
@@ -44,24 +39,16 @@ void readTopicConfig(KafkaProxyV3& v3, const QString& topic) {
 
             printTableRow({config.name, config.value, options}, columns);
         }
-    });
-
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug() << msg;
-        }
         QCoreApplication::quit();
     });
-        
+
     v3.readTopicConfig(topic);
 }
 
 
 void createTopic(KafkaProxyV3& v3, const QString& name, bool isCompact, qint32 replicationFactor) {
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug().noquote() << msg;
-        }
+    QObject::connect(&v3, &KafkaProxyV3::topicCreated, [name] {
+        qDebug().noquote() << "topic" << name << "is created";
         QCoreApplication::quit();
     });
     v3.createTopic(name, isCompact, replicationFactor);
@@ -69,35 +56,39 @@ void createTopic(KafkaProxyV3& v3, const QString& name, bool isCompact, qint32 r
 
 
 void deleteTopic(KafkaProxyV3& v3, const QString& name) {
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug().noquote() << msg;
-        }
+    QObject::connect(&v3, &KafkaProxyV3::topicDeleted, [name]() {
+        qDebug().noquote() << "topic " << name << "deleted";
         QCoreApplication::quit();
     });
     v3.deleteTopic(name);
 }
 
 
-void sendProtobufData(KafkaProxyV3& v3, const QString& topic, const QString& key, const QString& fileName) {
-    QFile f(fileName);
-    if (!f.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open" << fileName;
-        QCoreApplication::quit();
-        return;
-    }
+void deleteMany(KafkaProxyV3& v3, const QString& pattern) {
+    auto patternDelete = std::make_shared<TopicsDelete>(v3);
+    QObject::connect(patternDelete.get(), &TopicsDelete::confirm, [patternDelete]() {
+        QObject::disconnect(patternDelete.get(), &TopicsDelete::confirm, nullptr, nullptr);
 
-    auto doc = QJsonDocument::fromJson(f.readAll());
-    v3.sendProtobufData(topic, key, doc);
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug().noquote() << "error: " << msg;
+        qDebug().noquote() << "Are you sure? Type yes to delete the topics";
+        QTextStream inputStream(stdin);
+        QString line = inputStream.readLine();  // Reads a single line from stdin
+        if (line.trimmed() == "yes") {
+            patternDelete->executeDelete();
         } else {
-            qDebug().noquote() << "Success. Data sent";
+            qDebug().noquote() << "delete cancelled";
+            QCoreApplication::quit();
         }
+    });
+
+
+    QObject::connect(patternDelete.get(), &TopicsDelete::deleted, [patternDelete]() {
+        QObject::disconnect(patternDelete.get(), &TopicsDelete::deleted, nullptr, nullptr);
         QCoreApplication::quit();
     });
+    
+    patternDelete->patternDelete(pattern);
 }
+
 
 void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplication& app) {
     parser.process(app);
@@ -127,21 +118,14 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
         return;
     }
 
+    if (parser.isSet("delete-many")) {
+        deleteMany(v3, parser.value("delete-many"));
+        return;
+    }
+
+
     //no command to process
     parser.showHelp();
-}
-
-
-void startInitializion(KafkaProxyV3& v3) {
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg){
-        if (success) {
-            //            qDebug().noquote() << "clusterId: " << msg;
-        } else {
-            qDebug() << "Failed to establish connection with the server: " << msg;
-            QCoreApplication::quit();
-        }
-    });
-    v3.getClusterId();
 }
 
 
@@ -159,6 +143,7 @@ int main(int argc, char** argv) {
             {"config", "read topic details", "topic-name"},
             {"create", "create topic", "topic-name"},
             {"delete", "delete topic", "topic-name"},
+            {"delete-many", "delete multiple topics matching the pattern", "pattern"},
             {"set-compact", "set cleanup.policy = true"},
             {"set-replication-factor", "set topic-replication", "replication-factor"},
     });
@@ -170,15 +155,15 @@ int main(int argc, char** argv) {
 
 
     KafkaProxyV3 v3(server, user, password);
-    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](bool success){
-        if(success) {
-            QObject::disconnect(&v3, nullptr, nullptr, nullptr); 
-            executeCommands(v3, parser, app);
-        } else {
-            qWarning() << "Failed to obtain the clusterId";
-            QCoreApplication::quit();
-        }
+    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
+        executeCommands(v3, parser, app);
     });
-    startInitializion(v3);
+
+    QObject::connect(&v3, &KafkaProxyV3::failed, [](QString message){
+        qDebug().noquote() << message;
+        QCoreApplication::quit();
+    });
+
+    v3.getClusterId();
     return app.exec();
 }

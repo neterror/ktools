@@ -47,13 +47,18 @@ public:
     void createTopic(const QString& topic, bool isCompact, qint32 replicationFactor);
     void deleteTopic(const QString& topic);
 
-    void sendProtobufData(const QString& topic, const QString& key, const QJsonDocument& json);
+    void sendMessage(const QString& topic, const QString& key, const QJsonDocument& json);
 
     void getGroupConsumers(const QString& group);
 signals:
-    void initialized(bool success);
-    void topics(QList<Topic> data);
-    void groups(QList<Group> data);
-    void consumers(QList<Consumer> data);
+    void initialized(QString clusterId);
+    void topicList(QList<Topic> data);
+    void groupList(QList<Group> data);
+    void consumerList(QList<Consumer> data);
+
     void topicConfig(QList<TopicConfig> configs);
+    void topicCreated();
+    void topicDeleted();
+    void messageSent();
+    void failed(QString message);
 };

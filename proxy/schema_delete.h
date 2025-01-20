@@ -2,16 +2,16 @@
 #include "schema_registry.h"
 #include <QtCore>
 
-class SchemaUtils: public QObject {
+class SchemaDelete: public QObject {
     Q_OBJECT
     SchemaRegistry& mRegistry;
-    SchemaRegistry::Schema mSchema;
+    SchemaRegistry::Schema mDelete;
 
 private slots:
-    void onSchemaList(QList<SchemaRegistry::Schema> list);
+    void onSchemaToDeleteList(QList<SchemaRegistry::Schema> list);
     void onSchemaDeleted(bool success, QString subject, qint32 version);
 public:
-    SchemaUtils(SchemaRegistry& registry);
+    SchemaDelete(SchemaRegistry& registry);
     void deleteSchemaId(qint32 schemaId);
 signals:
     void error(QString msg);

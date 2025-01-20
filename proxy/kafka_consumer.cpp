@@ -26,7 +26,7 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QString topic) 
     connect(success,   &QState::entered, this, &KafkaConsumer::onSuccess);
     connect(error,     &QState::entered, this, &KafkaConsumer::onFailed);
 
-    init->addTransition(&mKafkaProxy, &KafkaProxyV2::ready, subscribe);
+    init->addTransition(&mKafkaProxy, &KafkaProxyV2::obtainedInstanceId, subscribe);
     subscribe->addTransition(&mKafkaProxy, &KafkaProxyV2::subscribed, read);
     read->addTransition(this, &KafkaConsumer::commitOffset, commit); //after received report, read again
     read->addTransition(this, &KafkaConsumer::readAgain, read);

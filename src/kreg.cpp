@@ -1,5 +1,6 @@
+#include "schema_create.h"
 #include "schema_registry.h"
-#include "schema_utils.h"
+#include "schema_delete.h"
 #include <QtCore>
 #include <qcommandlineoption.h>
 #include <qcoreapplication.h>
@@ -31,10 +32,9 @@ QStringList toStringList(const SchemaRegistry::Schema& schema) {
     return result;
 }
 
-void registerProtobuf(SchemaRegistry& registry, const QString& fileName, const QString& subject,
-                      const QString& referenceSubject, const QString& referenceVersion) {
+void registerProtobuf(SchemaCreate& creator, const QString& fileName, const QString& subject, QString referenceIds) {
     if (subject.isEmpty()) {
-        qWarning() << "Missing subject. Specify with --new-subject";
+        qWarning() << "Missing subject. Specify with --subject";
         exit(-1);
     }
 
@@ -44,32 +44,37 @@ void registerProtobuf(SchemaRegistry& registry, const QString& fileName, const Q
         exit(-1);
     }
     
-    int refVersion = -1;
-    if (!referenceVersion.isEmpty()) {
-        refVersion = referenceVersion.toInt();
+
+    QList<qint32> references;
+    if (!referenceIds.isEmpty()) {
+        for(const auto& t: referenceIds.split(",")) {
+            bool ok;
+            auto id = t.toInt(&ok);
+            if (ok) {
+                references.append(id);
+            }
+        }
     }
 
-    if (!referenceSubject.isEmpty() && (refVersion == -1)) {
-        qCritical() << "reference version is required";
-        exit(-1);
-    }
-
-    QObject::connect(&registry, &SchemaRegistry::ready, [subject](bool success, QString msg){
-        qDebug().noquote() << msg;
-
+    QObject::connect(&creator, &SchemaCreate::created, [subject](qint32 schemaId){
+        qDebug().noquote() << "created schemaId" << schemaId;
+        QCoreApplication::quit();
+    });
+    
+    QObject::connect(&creator, &SchemaCreate::error, [](QString message){
+        qWarning().noquote() << message;
         QCoreApplication::quit();
     });
 
-    registry.registerProtobuf(subject, f.readAll(), referenceSubject, refVersion);
+    creator.createSchema(subject, f.readAll(), "PROTOBUF", references);
 }
 
 void listSchemas(SchemaRegistry& registry) {
-    QObject::connect(&registry, &SchemaRegistry::registeredSchemas, [](const QList<SchemaRegistry::Schema>& schemas){
+    QObject::connect(&registry, &SchemaRegistry::schemaList, [](const QList<SchemaRegistry::Schema>& schemas){
         QList<int> columns = {10, 40, 10, 20};
         printTableRow({"SchemaId", "Subject", "Version", "Reference"}, columns);
         qDebug().noquote() << "-------------------------------------------------------";
         for (const auto& schema: schemas) {
-
             auto row = toStringList(schema);
             printTableRow(row, columns);
 
@@ -79,13 +84,13 @@ void listSchemas(SchemaRegistry& registry) {
     registry.getSchemas();
 }
 
-void deleteSchemaId(SchemaUtils& schemaUtils, qint32 schemaId) {
-    QObject::connect(&schemaUtils, &SchemaUtils::error, [](QString message){
+void deleteSchemaId(SchemaDelete& schemaDelete, qint32 schemaId) {
+    QObject::connect(&schemaDelete, &SchemaDelete::error, [](QString message){
         qWarning().noquote() << message;
         QCoreApplication::quit();
     });
 
-    QObject::connect(&schemaUtils, &SchemaUtils::deleted, [target=schemaId](bool success, qint32 schemaId, QString subject, qint32 version){
+    QObject::connect(&schemaDelete, &SchemaDelete::deleted, [target=schemaId](bool success, qint32 schemaId, QString subject, qint32 version){
         if (success) {
             qDebug().noquote() << "deleted schemaId" << schemaId << "subject" << subject << "version" << version;
         } else {
@@ -93,7 +98,7 @@ void deleteSchemaId(SchemaUtils& schemaUtils, qint32 schemaId) {
         }
         QCoreApplication::quit();
     });
-    schemaUtils.deleteSchemaId(schemaId);
+    schemaDelete.deleteSchemaId(schemaId);
 }
 
 int main(int argc, char** argv) {
@@ -106,10 +111,9 @@ int main(int argc, char** argv) {
 
     parser.addHelpOption();
     parser.addOptions({
-            {"new-file", "register protobuf file", "file.proto"},
-            {"new-subject", "The subject(name) in the registry of the file", "name"},
-            {"ref-subject", "The protobuf reference of the newly registered", "reference subject"},
-            {"ref-version", "The protobuf reference version", "version"},
+            {"schema", "register protobuf file", "file.proto"},
+            {"subject", "The subject(name) in the registry of the file", "name"},
+            {"reference", "Comma separated list of reference schemaIds", "schemaId list"},
 
             {"delete", "delete schema Id", "schemaId"},
             {"list", "list registered schemas"},
@@ -122,14 +126,19 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentSchemaRegistry/password").toString();
 
     SchemaRegistry registry(server, user, password);
-    SchemaUtils schemaUtils(registry);
+    std::unique_ptr<SchemaDelete> schemaDelete;
+    std::unique_ptr<SchemaCreate> schemaCreate;
 
+
+    QObject::connect(&registry, &SchemaRegistry::failed, [](QString message){
+        qWarning().noquote() << message;
+        QCoreApplication::quit();
+    });
 
     bool processed = false;
-    if (parser.isSet("new-file")) {
-        registerProtobuf(registry, parser.value("new-file"), parser.value("new-subject"),
-                         parser.value("ref-subject"), parser.value("ref-version"));
-
+    if (parser.isSet("schema")) {
+        schemaCreate.reset(new SchemaCreate(registry));
+        registerProtobuf(*schemaCreate, parser.value("schema"), parser.value("subject"), parser.value("reference"));
         processed = true;
     } 
 
@@ -139,7 +148,8 @@ int main(int argc, char** argv) {
     }
 
     if (!processed && parser.isSet("delete")) {
-        deleteSchemaId(schemaUtils, parser.value("delete").toInt());
+        schemaDelete.reset(new SchemaDelete(registry));
+        deleteSchemaId(*schemaDelete, parser.value("delete").toInt());
         processed = true;
     }
 

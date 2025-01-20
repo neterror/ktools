@@ -18,7 +18,7 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
     if (parser.isSet("groups")) {
         printTableRow({"GroupID", "State"}, {30, 10});
         qDebug().noquote() << "----------------------------------------";
-        QObject::connect(&v3, &KafkaProxyV3::groups, [](auto groups){
+        QObject::connect(&v3, &KafkaProxyV3::groupList, [](auto groups){
             for (const auto& group: groups) {
                 printTableRow({group.name, group.state}, {30, 10});
             }
@@ -31,7 +31,7 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
     if (parser.isSet("consumers")) {
         printTableRow({"GroupID", "ConsumerID", "ClientID"}, {30, 40, 40});
         qDebug().noquote() << "----------------------------------------";
-        QObject::connect(&v3, &KafkaProxyV3::consumers, [](auto result){
+        QObject::connect(&v3, &KafkaProxyV3::consumerList, [](auto result){
             for (const auto& consumer: result) {
                 qDebug().noquote() << "groupId:    " << consumer.groupId;
                 qDebug().noquote() << "consumerId: " << consumer.consumerId;
@@ -47,19 +47,6 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
 
     //no command to process""
     parser.showHelp();
-}
-
-
-void startInitializion(KafkaProxyV3& v3) {
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg){
-        if (success) {
-            //            qDebug().noquote() << "clusterId: " << msg;
-        } else {
-            qDebug() << "Failed to establish connection with the server: " << msg;
-            QCoreApplication::quit();
-        }
-    });
-    v3.getClusterId();
 }
 
 
@@ -82,15 +69,15 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
     KafkaProxyV3 v3(server, user, password);
-    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](bool success){
-        if(success) {
-            QObject::disconnect(&v3, nullptr, nullptr, nullptr); 
-            executeCommands(v3, parser, app);
-        } else {
-            qWarning() << "Failed to obtain the clusterId";
-            QCoreApplication::quit();
-        }
+    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
+        executeCommands(v3, parser, app);
     });
-    startInitializion(v3);
+
+    QObject::connect(&v3, &KafkaProxyV3::failed, [](QString message){
+        qDebug().noquote() << message;
+        QCoreApplication::quit();
+    });
+
+    v3.getClusterId();
     return app.exec();
 }

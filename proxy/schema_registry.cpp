@@ -14,14 +14,14 @@ SchemaRegistry::SchemaRegistry(QString server, QString user, QString password) :
 void SchemaRegistry::getSchemas() {
     mRest.get(requestV3("schemas"), this, [this](QRestReply& reply){
         if (!reply.isHttpStatusSuccess()) {
-            emit ready(false, QString("error: %1").arg(reply.httpStatus()));
+            emit failed(QString("error: %1").arg(reply.httpStatus()));
             return;
         }
 
         auto json = reply.readJson();
         if (!json || !json->isArray()) {
             qWarning() << "Unexpected json reply" << json;
-            emit ready(false, QString("Unexpected json reply %1").arg(json->toJson()));
+            emit failed(QString("Unexpected json reply %1").arg(json->toJson()));
             return;
         }
         
@@ -53,18 +53,17 @@ void SchemaRegistry::getSchemas() {
             
             report.append(result);
         }
-        emit registeredSchemas(report);
-        emit ready(true);
+        emit schemaList(report);
     });
 }
 
 
-bool SchemaRegistry::registerProtobuf(const QString& subject,
-                                      const QByteArray& protofileData,
-                                      const QString& referenceSubject,
-                                      qint32 referenceVersion)
+bool SchemaRegistry::createSchema(const QString& subject,
+                                    const QByteArray& schema,
+                                    const QString& schemaType,
+                                    const QList<SchemaRegistry::Schema>& references)
 {
-    auto json = registerProtobufRequest(subject, protofileData, referenceSubject, referenceVersion);
+    auto json = createSchemaJson(subject, schema, schemaType, references);
     if (json.isEmpty()) {
         return false;
     }
@@ -78,22 +77,17 @@ bool SchemaRegistry::registerProtobuf(const QString& subject,
 
         auto json = reply.readJson();
         if (!json) {
-            emit ready(false, "Failed to read JSON reply");
+            emit failed("Failed to read JSON reply");
             return;
         }
         
         auto obj = json->object();
-        QString msg;
         if (obj.contains("id")) {
-            msg = QString("Registered schema_id %1").arg(obj["id"].toInt());
-            success = true;
+            emit schemaCreated(obj["id"].toInt());
         } else {
-            if (obj.contains("error_code")) {
-                msg = json->toJson(QJsonDocument::Indented);
-                success = false;
-            }
+            auto msg = json->toJson(QJsonDocument::Indented);
+            emit failed(msg);
         }
-        emit ready(success, msg);
     });
     
     return true;
@@ -119,24 +113,29 @@ void SchemaRegistry::deleteSchema(const QString& subject, qint32 version) {
 
 
 
-QJsonDocument SchemaRegistry::registerProtobufRequest(const QString& subject,
-                                                      const QByteArray& protofileData,
-                                                      const QString& referenceSubject,
-                                                      qint32 referencedVersion)
+QJsonDocument SchemaRegistry::createSchemaJson(const QString& subject,
+                                               const QByteArray& schema,
+                                               const QString& schemaType,
+                                               const QList<Schema>& references)
+
 {
     auto json = QJsonObject {
-        {"schema", QString(protofileData)},
-        {"schemaType", "PROTOBUF"}
+        {"schema", QString(schema)},
+        {"schemaType", schemaType}
     };
 
-    if (!referenceSubject.isEmpty()) {
-        json["references"] = QJsonArray {
-            QJsonObject{
-                {"name", referenceSubject},
-                {"subject", referenceSubject},
-                {"version", referencedVersion},
-            }
-        };
+    auto array = QJsonArray();
+    for (const auto& schema: references) {
+        array.append(QJsonObject{
+                {"name", schema.subject},
+                {"subject", schema.subject},
+                {"version", schema.version},
+            });
     }
+
+    if (!array.isEmpty()) {
+        json["references"] = array;
+    }
+
     return QJsonDocument(json);
 }

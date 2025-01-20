@@ -20,7 +20,4 @@ private slots:
     void onAuthenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);
 public:
     HttpClient(QString server, QString user, QString password);
-
-signals:
-    void ready(bool success, QString message = "");
 };

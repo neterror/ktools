@@ -5,7 +5,7 @@
 #include "kafka_proxy_v3.h"
 
 
-void sendProtobufData(KafkaProxyV3& v3, const QString& topic, const QString& key, const QString& fileName) {
+void sendMessage(KafkaProxyV3& v3, const QString& topic, const QString& key, const QString& fileName) {
     QFile f(fileName);
     if (!f.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open" << fileName;
@@ -13,13 +13,9 @@ void sendProtobufData(KafkaProxyV3& v3, const QString& topic, const QString& key
         return;
     }
     auto doc = QJsonDocument::fromJson(f.readAll());
-    v3.sendProtobufData(topic, key, doc);
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg) {
-        if (!success) {
-            qDebug().noquote() << "error: " << msg;
-        } else {
-            qDebug().noquote() << "Success. Data sent";
-        }
+    v3.sendMessage(topic, key, doc);
+    QObject::connect(&v3, &KafkaProxyV3::messageSent, [] {
+        qDebug().noquote() << "Success. Data sent";
         QCoreApplication::quit();
     });
 }
@@ -27,22 +23,10 @@ void sendProtobufData(KafkaProxyV3& v3, const QString& topic, const QString& key
 void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplication& app) {
     parser.process(app);
     if (parser.isSet("topic") && parser.isSet("json")) {
-        sendProtobufData(v3, parser.value("topic"), parser.value("key"), parser.value("json"));
+        sendMessage(v3, parser.value("topic"), parser.value("key"), parser.value("json"));
         return;
     }
     parser.showHelp();
-}
-
-void startInitializion(KafkaProxyV3& v3) {
-    QObject::connect(&v3, &KafkaProxyV3::ready, [](bool success, QString msg){
-        if (success) {
-            //            qDebug().noquote() << "clusterId: " << msg;
-        } else {
-            qDebug() << "Failed to establish connection with the server: " << msg;
-            QCoreApplication::quit();
-        }
-    });
-    v3.getClusterId();
 }
 
 int main(int argc, char** argv) {
@@ -65,15 +49,15 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
     KafkaProxyV3 v3(server, user, password);
-    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](bool success){
-        if(success) {
-            QObject::disconnect(&v3, nullptr, nullptr, nullptr); 
-            executeCommands(v3, parser, app);
-        } else {
-            qWarning() << "Failed to obtain the clusterId";
-            QCoreApplication::quit();
-        }
+    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
+        executeCommands(v3, parser, app);
     });
-    startInitializion(v3);
+
+    QObject::connect(&v3, &KafkaProxyV3::failed, [](QString message){
+        qDebug().noquote() << message;
+        QCoreApplication::quit();
+    });
+
+    v3.getClusterId();
     return app.exec();
 }

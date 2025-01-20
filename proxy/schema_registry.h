@@ -7,7 +7,6 @@
 
 class SchemaRegistry : public HttpClient {
     Q_OBJECT
-    QJsonDocument registerProtobufRequest(const QString& subject, const QByteArray& protofileData, const QString& referenceSubject, qint32 referenceVersion);
 public:
     struct Reference {
         QString name;
@@ -27,9 +26,14 @@ public:
     SchemaRegistry(QString server, QString user, QString password);
 
     void getSchemas();
-    bool registerProtobuf(const QString& subject, const QByteArray& protofileData, const QString& referenceSubject = "", qint32 referenceVersion = -1);
+    bool createSchema(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);
     void deleteSchema(const QString& subject, qint32 version);
 signals:
-    void registeredSchemas(QList<Schema> schemas);
+    void schemaList(QList<Schema> schemas);
     void schemaDeleted(bool success, QString subject, qint32 version);
+    void schemaCreated(qint32 schemaId);
+    void failed(QString message);
+
+private:
+    QJsonDocument createSchemaJson(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);
 };

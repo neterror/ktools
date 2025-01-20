@@ -29,13 +29,11 @@ void KafkaProxyV3::getClusterId() {
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
         if (data.empty()) {
-            emit ready(false, errorMsg);
-            emit initialized(false);
+            emit failed(errorMsg);
         } else {
             auto obj = data[0].toObject();
             mClusterID = obj["cluster_id"].toString();
-            emit ready(true, mClusterID);
-            emit initialized(true);
+            emit initialized(mClusterID);
         }
     });
 }
@@ -48,7 +46,7 @@ void KafkaProxyV3::listTopics() {
         QString errorMsg;
         auto array = getDataArray(reply, errorMsg);
         if (array.empty()) {
-            emit ready(false, errorMsg);
+            emit failed(errorMsg);
             return;
         }
 
@@ -60,8 +58,7 @@ void KafkaProxyV3::listTopics() {
                     obj["is_internal"].toBool(),
                 });
         }
-        emit topics(result);
-        emit ready(true, "");
+        emit topicList(result);
     });
 }
 
@@ -71,8 +68,7 @@ void KafkaProxyV3::readTopicConfig(const QString& name) {
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
         if (data.empty()) {
-            emit ready(false, errorMsg);
-            emit initialized(false);
+            emit failed(errorMsg);
             return;
         }
 
@@ -90,7 +86,6 @@ void KafkaProxyV3::readTopicConfig(const QString& name) {
             result << config;
         }
         emit topicConfig(result);
-        emit ready(true);
     });
 }
 
@@ -110,7 +105,7 @@ void KafkaProxyV3::createTopic(const QString& topic, bool isCompact, qint32 repl
     auto url = QString("v3/clusters/%1/topics").arg(mClusterID);
     mRest.post(requestV3(url), QJsonDocument(payload), this, [this](QRestReply &reply) {
         if (reply.isHttpStatusSuccess()) {
-            emit ready(true);
+            emit topicCreated();
         } else {
             QString msg = "Failed to create the topic: ";
             if (auto doc = reply.readJson(); doc) {
@@ -119,7 +114,7 @@ void KafkaProxyV3::createTopic(const QString& topic, bool isCompact, qint32 repl
                     msg += obj["message"].toString();
                 }
             }
-            emit ready(false, msg);
+            emit failed(msg);
         }
     });
 }
@@ -128,7 +123,7 @@ void KafkaProxyV3::deleteTopic(const QString& topic) {
     auto url = QString("v3/clusters/%1/topics/%2").arg(mClusterID).arg(topic);
     mRest.deleteResource(requestV3(url), this, [this](QRestReply &reply) {
         if (reply.isHttpStatusSuccess()) {
-            emit ready(true);
+            emit topicDeleted();
         } else {
             QString msg = "Failed to delete the topic: ";
             if (auto doc = reply.readJson(); doc) {
@@ -138,14 +133,14 @@ void KafkaProxyV3::deleteTopic(const QString& topic) {
                     msg += obj["message"].toString();
                 }
             }
-            emit ready(false, msg);
+            emit failed(msg);
         }
     });
 }
 
 
 
-void KafkaProxyV3::sendProtobufData(const QString& topic, const QString& key, const QJsonDocument& json) {
+void KafkaProxyV3::sendMessage(const QString& topic, const QString& key, const QJsonDocument& json) {
     auto url = QString("v3/clusters/%1/topics/%2/records").arg(mClusterID).arg(topic);
     QJsonObject payload;
     if (!key.isEmpty()) {
@@ -162,17 +157,17 @@ void KafkaProxyV3::sendProtobufData(const QString& topic, const QString& key, co
     mRest.post(requestV3(url), QJsonDocument(payload), this, [this](QRestReply &reply) {
         auto data = reply.readJson();
         if (!data || !data->isObject()) {
-            emit ready(false, "Unkown error");
+            emit failed("Unkown error");
             return;
         }
 
         auto obj = data->object();
         auto errorCode = obj["error_code"].toInt();
         if (errorCode == 200) {
-            emit ready(true);
+            emit messageSent();
         } else {
             auto errorMsg = obj["message"].toString();
-            emit ready(false, errorMsg);
+            emit failed(errorMsg);
         }
     });
 }
@@ -184,7 +179,7 @@ void KafkaProxyV3::listGroups() {
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
         if (!errorMsg.isEmpty()) {
-            emit ready(false, errorMsg);
+            emit failed(errorMsg);
             return;
         }
 
@@ -196,7 +191,7 @@ void KafkaProxyV3::listGroups() {
                     obj["state"].toString()
                 });
         }
-        emit groups(result);
+        emit groupList(result);
     });
 }
 
@@ -207,7 +202,7 @@ void KafkaProxyV3::getGroupConsumers(const QString& group) {
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
         if (!errorMsg.isEmpty()) {
-            emit ready(false, errorMsg);
+            emit failed(errorMsg);
             return;
         }
 
@@ -220,7 +215,7 @@ void KafkaProxyV3::getGroupConsumers(const QString& group) {
                     obj["client_id"].toString(),
                 });
         }
-        emit consumers(result);
+        emit consumerList(result);
     });
 }
         
