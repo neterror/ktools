@@ -50,6 +50,7 @@ void KafkaProxyV2::deleteInstanceId() {
             message = words.join(" ");
         }
         
+        qDebug() << "instanceID" << mInstanceId << "deleted";
         emit finished(message);
     });
 }

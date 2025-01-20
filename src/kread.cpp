@@ -65,7 +65,10 @@ int main(int argc, char** argv) {
     }
 
     QObject::connect(&consumer, &KafkaConsumer::received, [](auto message) {receivedMessage(message);});
-    QObject::connect(&consumer, &KafkaConsumer::finished, [] {QCoreApplication::quit();});
+    QObject::connect(&consumer, &KafkaConsumer::finished, [] {
+        qDebug().noquote() << "KafkaConsumer::finished";
+        QCoreApplication::quit();
+    });
     consumer.start();
 
     return app.exec();

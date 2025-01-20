@@ -37,7 +37,6 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QString topic) 
     //and report the receive message 
     connect(&mKafkaProxy, &KafkaProxyV2::received, this, &KafkaConsumer::received);
     connect(&mKafkaProxy, &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
-    connect(&mKafkaProxy, &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
 
     connect(&mKafkaProxy, &KafkaProxyV2::receivedOffset, [this](qint32 offset) {
         mLastOffset = offset;
