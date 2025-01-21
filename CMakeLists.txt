@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(httpkafka)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network StateMachine Protobuf)
+find_package(Qt6 REQUIRED COMPONENTS Core Network StateMachine)
 qt_standard_project_setup()
 
 set(CMAKE_BUILD_TYPE Debug)
