@@ -2,6 +2,7 @@
 #include <qcommandlineparser.h>
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
+#include "kafka_proxy_v2.h"
 #include "kafka_proxy_v3.h"
 
 void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
@@ -13,7 +14,7 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 }
 
 
-void listGroups(KafkaProxyV3& v3, QCoreApplication& app) {
+void listGroups(KafkaProxyV3& v3) {
     QObject::connect(&v3, &KafkaProxyV3::groupList, [](auto groups){
         printTableRow({"GroupID", "State"}, {30, 10});
         qDebug().noquote() << "----------------------------------------";
@@ -26,7 +27,7 @@ void listGroups(KafkaProxyV3& v3, QCoreApplication& app) {
     v3.listGroups();
 }
 
-void listConsumers(KafkaProxyV3& v3, const QString& groupName, QCoreApplication& app) {
+void listConsumers(KafkaProxyV3& v3, const QString& groupName) {
     QObject::connect(&v3, &KafkaProxyV3::consumerList, [](auto result){
         printTableRow({"GroupID", "ConsumerID", "ClientID"}, {30, 40, 40});
         qDebug().noquote() << "----------------------------------------";
@@ -44,7 +45,7 @@ void listConsumers(KafkaProxyV3& v3, const QString& groupName, QCoreApplication&
 }
 
 
-void showGroupLag(KafkaProxyV3& v3, const QString& groupName, QCoreApplication& app) {
+void showGroupLag(KafkaProxyV3& v3, const QString& groupName) {
     QObject::connect(&v3, &KafkaProxyV3::groupLags, [&v3](auto result){
         printTableRow({"topic", "pos", "end", "lag", "group"}, {35,5,5,5,10});
         qDebug().noquote() << "-------------------------------------------------------------";
@@ -64,7 +65,7 @@ void showGroupLag(KafkaProxyV3& v3, const QString& groupName, QCoreApplication& 
     v3.getGroupLag(groupName);
 }
 
-void showLagSummary(KafkaProxyV3& v3, const QString& groupName, QCoreApplication& app) {
+void showLagSummary(KafkaProxyV3& v3, const QString& groupName) {
     QObject::connect(&v3, &KafkaProxyV3::groupLagSummary, [&v3](KafkaProxyV3::GroupLagSummary result){
         printTableRow({"topic", "max-lag", "total-lag", "group"}, {35,5,5,10});
         qDebug().noquote() << "-------------------------------------------------------------";
@@ -83,10 +84,20 @@ void showLagSummary(KafkaProxyV3& v3, const QString& groupName, QCoreApplication
 
 
 
-void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplication& app) {
-    parser.process(app);
+void v2Commands(KafkaProxyV2& v2, QCommandLineParser& parser) {
+    auto offset = parser.value("set-offset").toInt();
+    v2.commitOffset(parser.value("topic"), offset);
+    QObject::connect(&v2, &KafkaProxyV2::offsetCommitted, [offset]{
+        qDebug().noquote() << "Reading position set to" << offset;
+        QCoreApplication::quit();
+    });
+}
+
+
+
+void v3Commands(KafkaProxyV3& v3, QCommandLineParser& parser) {
     if (parser.isSet("list")) {
-        listGroups(v3, app);
+        listGroups(v3);
         return;
     }
 
@@ -97,17 +108,17 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
     auto group = parser.value("group");
 
     if (parser.isSet("consumers")) {
-        listConsumers(v3, group, app);
+        listConsumers(v3, group);
         return;
     }
 
     if (parser.isSet("lag")) {
-        showGroupLag(v3, group, app);
+        showGroupLag(v3, group);
         return;
     }
 
     if (parser.isSet("lag-summary")) {
-        showLagSummary(v3, group, app);
+        showLagSummary(v3, group);
         return;
     }
     
@@ -133,6 +144,7 @@ int main(int argc, char** argv) {
             {"lag", "Get group lag data"},
             {"lag-summary", "Get lat summary"},
             {"set-offset", "Set reading offset", "set-offset"},
+            {"topic", "change the offset of topic", "topic"}
             
     });
 
@@ -141,16 +153,37 @@ int main(int argc, char** argv) {
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
-    KafkaProxyV3 v3(server, user, password);
-    QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
-        executeCommands(v3, parser, app);
-    });
+    parser.process(app);
+    std::unique_ptr<KafkaProxyV2> v2;
+    std::unique_ptr<KafkaProxyV3> v3;
 
-    QObject::connect(&v3, &KafkaProxyV3::failed, [](QString message){
-        qDebug().noquote() << message;
-        QCoreApplication::quit();
-    });
+    if (parser.isSet("set-offset")) {
+        if (!parser.isSet("group") || !parser.isSet("topic")) {
+            qDebug() << "For set-offset specify topic and group";
+            return -1;
+        }
 
-    v3.getClusterId();
+        v2.reset(new KafkaProxyV2(server, user, password));
+        QObject::connect(v2.get(), &KafkaProxyV2::obtainedInstanceId, [&v2, &parser, &app](QString instanceId){
+            v2Commands(*v2, parser);
+        });
+        QObject::connect(v2.get(), &KafkaProxyV2::failed, [](QString message){
+            qDebug().noquote() << message;
+            QCoreApplication::quit();
+        });
+        v2->requestInstanceId(parser.value("group"));
+    } else {
+        v3.reset(new KafkaProxyV3(server, user, password));
+        QObject::connect(v3.get(), &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
+            v3Commands(*v3, parser);
+        });
+
+        QObject::connect(v3.get(), &KafkaProxyV3::failed, [](QString message){
+            qDebug().noquote() << message;
+            QCoreApplication::quit();
+        });
+        v3->getClusterId();
+    }
+
     return app.exec();
 }

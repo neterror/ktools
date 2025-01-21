@@ -131,7 +131,11 @@ void KafkaProxyV2::commitOffset(QString topic, qint32 offset) {
 
     auto url = QString("consumers/%1/instances/%2/offsets").arg(mGroupName).arg(mInstanceId);
     mRest.post(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
-        emit offsetCommitted();
+        if (!reply.isHttpStatusSuccess()) {
+            emit failed(QString("error %1").arg(reply.httpStatus()));
+        } else {
+            emit offsetCommitted();
+        }
     });
 }
 
