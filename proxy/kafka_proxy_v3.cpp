@@ -196,9 +196,70 @@ void KafkaProxyV3::listGroups() {
 }
 
 
+void KafkaProxyV3::getGroupLag(const QString& group) {
+    auto url = QString("v3/clusters/%1/consumer-groups/%2/lags").arg(mClusterID).arg(group);
+    mRest.get(requestV3(url), this, [this,group](QRestReply& reply){
+        if (reply.httpStatus() == 404) {
+            emit failed(QString("group %1 not found").arg(group));
+            return;
+        }
+        QString errorMsg;
+        auto data = getDataArray(reply, errorMsg);
+        if (!errorMsg.isEmpty()) {
+            emit failed(errorMsg);
+            return;
+        }
+
+        QList<GroupLag> result;
+        for(const auto& item: data) {
+            auto obj = item.toObject();
+            result.append({
+                    obj["consumer_group_id"].toString(),
+                    obj["consumer_id"].toString(),
+                    obj["topic_name"].toString(),
+                    obj["current_offset"].toInt(),
+                    obj["log_end_offset"].toInt(),
+                    obj["lag"].toInt()
+                });
+        }
+        emit groupLags(result);
+    });
+}
+
+void KafkaProxyV3::getGroupLagSummary(const QString& group) {
+    auto url = QString("v3/clusters/%1/consumer-groups/%2/lag-summary").arg(mClusterID).arg(group);
+    mRest.get(requestV3(url), this, [this,group](QRestReply& reply){
+        if (reply.httpStatus() == 404) {
+            emit failed(QString("group %1 not found").arg(group));
+            return;
+        }
+
+        auto data = reply.readJson();
+        if (!data || !data->isObject()) {
+            emit failed("Could not read lag summary");
+            return;
+        }
+        auto obj = data->object();
+        GroupLagSummary result;
+        result.groupName = obj["consumer_group_id"].toString();
+        result.consumerId = obj["consumer_id"].toString();
+        result.topic = obj["max_lag_topic_name"].toString();
+        result.maxLag = obj["max_lag"].toInt();
+        result.totalLag = obj["total_lag"].toInt();
+
+        emit groupLagSummary(result);
+    });
+}
+        
+
 void KafkaProxyV3::getGroupConsumers(const QString& group) {
     auto url = QString("v3/clusters/%1/consumer-groups/%2/consumers").arg(mClusterID).arg(group);
-    mRest.get(requestV3(url), this, [this](QRestReply& reply){
+    mRest.get(requestV3(url), this, [this,group](QRestReply& reply){
+        if (reply.httpStatus() == 404) {
+            emit failed(QString("group %1 not found").arg(group));
+            return;
+        }
+
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
         if (!errorMsg.isEmpty()) {

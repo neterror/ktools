@@ -37,6 +37,25 @@ public:
         QString clientId;
     };
 
+
+    struct GroupLag {
+        QString groupName;
+        QString consumerId;
+        QString topic;
+        qint32 currentOffset;
+        qint32 endOffset;
+        qint32 lag;
+    };
+
+    struct GroupLagSummary {
+        QString groupName;
+        QString topic;
+        QString consumerId;
+        qint32 maxLag;
+        qint32 totalLag;
+    };
+    
+
     KafkaProxyV3(QString server, QString user, QString password);
     void getClusterId();
 
@@ -48,13 +67,17 @@ public:
     void deleteTopic(const QString& topic);
 
     void sendMessage(const QString& topic, const QString& key, const QJsonDocument& json);
-
     void getGroupConsumers(const QString& group);
+    void getGroupLag(const QString& group);
+    void getGroupLagSummary(const QString& group);
+
 signals:
     void initialized(QString clusterId);
     void topicList(QList<Topic> data);
     void groupList(QList<Group> data);
     void consumerList(QList<Consumer> data);
+    void groupLags(QList<GroupLag> data);
+    void groupLagSummary(GroupLagSummary data);
 
     void topicConfig(QList<TopicConfig> configs);
     void topicCreated();
