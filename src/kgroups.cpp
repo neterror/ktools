@@ -2,8 +2,8 @@
 #include <qcommandlineparser.h>
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
-#include "kafka_proxy_v2.h"
 #include "kafka_proxy_v3.h"
+#include "kafka_proxy_v2.h"
 
 void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
     QString formattedRow;
@@ -152,6 +152,8 @@ int main(int argc, char** argv) {
     auto server = settings.value("ConfluentRestProxy/server").toString();
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
+
+    qDebug().noquote() << "Connecting to server" << server;
 
     parser.process(app);
     std::unique_ptr<KafkaProxyV2> v2;

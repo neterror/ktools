@@ -53,6 +53,8 @@ int main(int argc, char** argv) {
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
+    qDebug().noquote() << "Connecting to server" << server;
+    
     KafkaProxyV2 v2(server, user, password);
     KafkaConsumer consumer(v2, parser.value("group"), parser.value("topic"));
 

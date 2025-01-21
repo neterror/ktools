@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
     auto server = settings.value("ConfluentRestProxy/server").toString();
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
+    qDebug().noquote() << "Connecting to server" << server;
 
     KafkaProxyV3 v3(server, user, password);
     QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){

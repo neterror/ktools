@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
     auto server = settings.value("ConfluentSchemaRegistry/server").toString();
     auto user = settings.value("ConfluentSchemaRegistry/user").toString();
     auto password = settings.value("ConfluentSchemaRegistry/password").toString();
+    qDebug().noquote() << "Connecting to server" << server;
 
     SchemaRegistry registry(server, user, password);
     std::unique_ptr<SchemaDelete> schemaDelete;
