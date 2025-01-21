@@ -3,6 +3,8 @@ add_library(kproxy STATIC
   http_client.h
   kafka_consumer.cpp
   kafka_consumer.h
+  kafka_producer.cpp
+  kafka_producer.h
   kafka_proxy_v2.cpp
   kafka_proxy_v2.h
   kafka_proxy_v3.cpp

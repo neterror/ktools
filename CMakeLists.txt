@@ -25,7 +25,7 @@ target_link_libraries(ktopics PUBLIC Qt6::Core Qt6::Network kproxy)
 
 ##### KWrite
 ########################################################
-add_executable(kwrite src/kwrite.cpp)
+add_executable(kwrite src/kwrite.cpp src/stdin_reader.cpp src/stdin_reader.h)
 target_link_libraries(kwrite PUBLIC Qt6::Core Qt6::Network kproxy)
 
 
