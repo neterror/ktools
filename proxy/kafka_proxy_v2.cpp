@@ -89,14 +89,30 @@ void KafkaProxyV2::subscribe(const QString& topic) {
     });
 }
 
+void KafkaProxyV2::stopReading() {
+    if (mPendingRead) {
+        mPendingRead->abort();
+        mPendingRead = nullptr;
+    }
+}
+
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
-    mRest.get(requestV2(url,true), this, [this](QRestReply& reply){
+    mPendingRead = mRest.get(requestV2(url,true), this, [this](QRestReply& reply){
+        if (!mPendingRead->isReadable()) {
+            mPendingRead = nullptr;
+            return;
+        }
         auto json = reply.readJson();
         qint32 lastOffset = -1;
         if (!json || !json->isArray()) {
-            qWarning().noquote() << "received invalid records - array in the json";
+            QString error = QString("Read error. ");
+            if (json->isObject()) {
+                auto obj = json->object();
+                error += obj["message"].toString();
+            }
+            emit failed(error);
         } else {
             for (const auto& item: json->array()) {
                 auto obj = item.toObject();

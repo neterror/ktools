@@ -64,11 +64,16 @@ int main(int argc, char** argv) {
         parser.showHelp();
     }
 
+
+    QObject::connect(&v2, &KafkaProxyV2::failed, [](QString error) {
+        qWarning().noquote() << error;
+    });
+
     QObject::connect(&consumer, &KafkaConsumer::received, [](auto message) {receivedMessage(message);});
     QObject::connect(&consumer, &KafkaConsumer::finished, [] {
-        qDebug().noquote() << "KafkaConsumer::finished";
         QCoreApplication::quit();
     });
+
     consumer.start();
 
     return app.exec();

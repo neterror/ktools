@@ -6,7 +6,7 @@ class KafkaProxyV2 : public HttpClient {
     Q_OBJECT
     QString mInstanceId;
     QString mGroupName;
-
+    QNetworkReply* mPendingRead {nullptr};
 public:
     struct Message {
         QString key;
@@ -23,10 +23,11 @@ public:
     void requestInstanceId(const QString& groupName);
     void subscribe(const QString& topic);
     void getRecords();
+    void stopReading();
 
     void commitOffset(QString topic, qint32 offset);
     void getOffset(const QString& group, const QString& topic);
-
+    
 signals:
     void obtainedInstanceId(QString intanceId);
     void subscribed(QString topics);

@@ -41,10 +41,8 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QString topic) 
     connect(&mKafkaProxy, &KafkaProxyV2::receivedOffset, [this](qint32 offset) {
         mLastOffset = offset;
         if (offset != -1) {
-            qDebug() << "commit read offset" << mLastOffset;
             emit commitOffset();
         } else {
-            qDebug() << "nothing read";
             emit readAgain();
         }
     });
@@ -55,12 +53,12 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QString topic) 
 }
 
 void KafkaConsumer::start() {
-    qDebug() << "KafkaConsumer::start";
     mSM.start();
 }
 
 void KafkaConsumer::stop() {
     qWarning().noquote() << "Stop Request";
+    mKafkaProxy.stopReading();
     emit stopRequest();
 }
 
