@@ -140,7 +140,7 @@ void KafkaProxyV3::deleteTopic(const QString& topic) {
 
 
 
-void KafkaProxyV3::sendMessage(const QString& topic, const QString& key, const QJsonDocument& json) {
+void KafkaProxyV3::sendMessage(const QString& key, const QString& topic, const QJsonDocument& json) {
     auto url = QString("v3/clusters/%1/topics/%2/records").arg(mClusterID).arg(topic);
     QJsonObject payload;
     if (!key.isEmpty()) {

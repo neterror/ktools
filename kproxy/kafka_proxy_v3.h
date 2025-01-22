@@ -66,7 +66,7 @@ public:
     void createTopic(const QString& topic, bool isCompact, qint32 replicationFactor);
     void deleteTopic(const QString& topic);
 
-    void sendMessage(const QString& topic, const QString& key, const QJsonDocument& json);
+    void sendMessage(const QString& key, const QString& topic, const QJsonDocument& json);
     void getGroupConsumers(const QString& group);
     void getGroupLag(const QString& group);
     void getGroupLagSummary(const QString& group);

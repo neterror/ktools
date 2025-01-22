@@ -7,7 +7,7 @@
 #include "stdin_reader.h"
 
 
-void sendMessage(KafkaProxyV3& v3, const QString& topic, const QString& key, const QString& fileName) {
+void sendMessage(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& fileName) {
     QFile f(fileName);
     if (!f.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open" << fileName;
@@ -22,7 +22,7 @@ void sendMessage(KafkaProxyV3& v3, const QString& topic, const QString& key, con
         return;
     }
 
-    v3.sendMessage(topic, key, doc);
+    v3.sendMessage(key, topic, doc);
     QObject::connect(&v3, &KafkaProxyV3::messageSent, [] {
         qDebug().noquote() << "Success. Data sent";
         QCoreApplication::quit();
@@ -42,7 +42,7 @@ void interactiveMode(KafkaProxyV3& v3, StdinReader& reader, const QString& topic
         auto doc = QJsonDocument::fromJson(line.toUtf8(), &error);
         if (doc.isObject()) {
             qDebug() << "sending on topic " << topic;
-            producer->send({topic, key, doc});
+            producer->send({key, topic, doc});
         } else {
             qWarning().noquote() << error.errorString();
         }
@@ -57,7 +57,7 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, StdinReader& 
     }
 
     if (parser.isSet("file")) {
-        sendMessage(v3, parser.value("topic"), parser.value("key"), parser.value("file"));
+        sendMessage(v3, parser.value("key"), parser.value("topic"), parser.value("file"));
         return;
     }
 
