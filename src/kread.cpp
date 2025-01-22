@@ -19,7 +19,7 @@ static void cleanExit(int) {
 }
 
 
-static void receivedMessage(const KafkaProxyV2::Message& message) {
+static void receivedMessage(const InputMessage& message) {
     QJsonObject msg;
     msg["info"] = QJsonObject {
         {"topic", message.topic},

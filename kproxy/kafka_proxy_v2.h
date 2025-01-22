@@ -1,6 +1,8 @@
 #pragma once
 #include "http_client.h"
 #include <qjsondocument.h>
+#include "kafka_messages.h"
+
 
 class KafkaProxyV2 : public HttpClient {
     Q_OBJECT
@@ -8,13 +10,6 @@ class KafkaProxyV2 : public HttpClient {
     QString mGroupName;
     QNetworkReply* mPendingRead {nullptr};
 public:
-    struct Message {
-        QString key;
-        qint32 offset;
-        qint32 partition;
-        QString topic;
-        QJsonObject value;
-    };
 
     QString instanceId() const {return mInstanceId;}
     void deleteInstanceId();
@@ -32,7 +27,7 @@ signals:
     void obtainedInstanceId(QString intanceId);
     void subscribed(QString topics);
     void finished(QString message);
-    void received(Message message);
+    void received(InputMessage message);
     void failed(QString message);
     void receivedOffset(qint32 offset);
     void offsetCommitted();

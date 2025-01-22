@@ -116,7 +116,7 @@ void KafkaProxyV2::getRecords() {
         } else {
             for (const auto& item: json->array()) {
                 auto obj = item.toObject();
-                Message message;
+                InputMessage message;
                 message.key = obj["key"].toString();
                 message.offset = obj["offset"].toInt();
                 message.partition = obj["partition"].toInt();

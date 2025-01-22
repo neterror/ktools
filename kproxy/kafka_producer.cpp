@@ -38,7 +38,7 @@ void KafkaProducer::onSend() {
     mProxy.sendMessage(data.topic, data.key, data.value);
 }
 
-void KafkaProducer::send(Message data) {
+void KafkaProducer::send(OutputMessage data) {
     mQueue.emplace_back(std::move(data));
     emit newData();
 }

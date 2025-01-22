@@ -1,5 +1,6 @@
 #pragma once
 #include "kafka_proxy_v2.h"
+#include "kafka_messages.h"
 #include <QStateMachine>
 #include <QObject>
 
@@ -19,7 +20,7 @@ public:
     void start();
     void stop();
 signals:
-    void received(KafkaProxyV2::Message message);
+    void received(InputMessage message);
     void commitOffset();
     void readAgain();
     void stopRequest();
