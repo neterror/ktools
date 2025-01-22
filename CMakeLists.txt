@@ -46,3 +46,28 @@ install(TARGETS kwrite DESTINATION bin)
 install(TARGETS kread DESTINATION bin)
 install(TARGETS kgroups DESTINATION bin)
 
+
+
+include(GNUInstallDirs)
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/kproxy
+  CACHE PATH "Location of header files"
+)
+
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(kproxyConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kproxy
+  PATH_VARS INCLUDE_INSTALL_DIR 
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfigVersion.cmake
+  VERSION 1.0.0
+  COMPATIBILITY SameMajorVersion
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kproxy
+)
