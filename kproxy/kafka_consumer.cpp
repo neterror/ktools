@@ -33,9 +33,9 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QString topic) 
 
     commit->addTransition(&mKafkaProxy, &KafkaProxyV2::offsetCommitted, read);
 
-
     //and report the receive message 
-    connect(&mKafkaProxy, &KafkaProxyV2::received, this, &KafkaConsumer::received);
+    connect(&mKafkaProxy, &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
+    connect(&mKafkaProxy, &KafkaProxyV2::receivedBinary, this, &KafkaConsumer::receivedBinary);
     connect(&mKafkaProxy, &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
 
     connect(&mKafkaProxy, &KafkaProxyV2::receivedOffset, [this](qint32 offset) {

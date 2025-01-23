@@ -13,8 +13,8 @@ protected:
     QString mPassword;
 
     QString baseUrl(const QString& path) const;
-    QNetworkRequest requestV2(QString path, bool protobufContent = false) const;
-    QNetworkRequest requestV3(QString path) const;
+    QNetworkRequest requestV2(const QString& path, const QString& type = "") const;
+    QNetworkRequest requestV3(const QString& path) const;
 
 private slots:
     void onAuthenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);

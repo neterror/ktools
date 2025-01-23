@@ -1,15 +1,21 @@
 #include "kafka_proxy_v2.h"
 #include "http_client.h"
+#include "kafka_messages.h"
+#include <qjsondocument.h>
 #include <qsslerror.h>
+#include <qstringview.h>
 
-KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password) : HttpClient(server, user, password) {
+KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, QString mediaType) :
+    HttpClient(server, user, password),
+    mMediaType(mediaType)
+{
 }
 
 
 void KafkaProxyV2::requestInstanceId(const QString& groupName) {
     auto url = QString("consumers/%1").arg(groupName);
     auto json = QJsonObject {
-        {"format", "protobuf"},
+        {"format", mMediaType},
 
         {"fetch.min.bytes", 1}, //when at least 1 byte is available - report it immediately, don't wait the timeout
         {"consumer.request.timeout.ms", 10000},
@@ -40,6 +46,7 @@ void KafkaProxyV2::requestInstanceId(const QString& groupName) {
 
 void KafkaProxyV2::deleteInstanceId() {
     auto url = QString("consumers/%1/instances/%2").arg(mGroupName).arg(mInstanceId);
+    qDebug().noquote() << "request to delete" << url;
     mRest.deleteResource(requestV2(url), this, [this](QRestReply &reply) {
         QString message;
         if (reply.isHttpStatusSuccess()) {
@@ -99,13 +106,12 @@ void KafkaProxyV2::stopReading() {
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
-    mPendingRead = mRest.get(requestV2(url,true), this, [this](QRestReply& reply){
+    mPendingRead = mRest.get(requestV2(url,mMediaType), this, [this](QRestReply& reply){
         if (!mPendingRead->isReadable()) {
             mPendingRead = nullptr;
             return;
         }
         auto json = reply.readJson();
-        qint32 lastOffset = -1;
         if (!json || !json->isArray()) {
             QString error = QString("Read error. ");
             if (json->isObject()) {
@@ -113,24 +119,46 @@ void KafkaProxyV2::getRecords() {
                 error += obj["message"].toString();
             }
             emit failed(error);
-        } else {
-            for (const auto& item: json->array()) {
-                auto obj = item.toObject();
-                InputMessage message;
-                message.key = obj["key"].toString();
-                message.offset = obj["offset"].toInt();
-                message.partition = obj["partition"].toInt();
-                message.topic = obj["topic"].toString();
-                message.value = obj["value"].toObject();
-
-                lastOffset = message.offset;
-                emit received(message);
-            }
-            
+            return;
         }
+
+        qint32 lastOffset = -1;
+        for (const auto& item: json->array()) {
+            if (mMediaType == kMediaProtobuf) {
+                lastOffset = reportInputJson(item.toObject());
+            } else if (mMediaType == kMediaBinary) {
+                lastOffset = reportInputBinary(item.toObject());
+            } else {
+                qWarning() << "invalid media type";
+            }
+        }
+
         emit receivedOffset(lastOffset);
     });
 }
+
+qint32 KafkaProxyV2::reportInputJson(const QJsonObject& obj) {
+    InputMessage<QJsonDocument> input;
+    input.key = obj["key"].toString();
+    input.offset = obj["offset"].toInt();
+    input.partition = obj["partition"].toInt();
+    input.topic = obj["topic"].toString();
+    input.value = QJsonDocument{obj["value"].toObject()};
+    emit receivedJson(input);
+    return input.offset;
+}
+
+qint32 KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
+    InputMessage<QByteArray> input;
+    input.key = obj["key"].toString();
+    input.offset = obj["offset"].toInt();
+    input.partition = obj["partition"].toInt();
+    input.topic = obj["topic"].toString();
+    input.value = QByteArray::fromBase64(obj["topic"].toString().toUtf8());
+    emit receivedBinary(input);
+    return input.offset;
+}
+
 
 
 void KafkaProxyV2::commitOffset(QString topic, qint32 offset) {

@@ -20,7 +20,7 @@ QString HttpClient::baseUrl(const QString& path) const {
 }
 
 
-QNetworkRequest HttpClient::requestV3(QString path) const{
+QNetworkRequest HttpClient::requestV3(const QString& path) const{
     auto request = QNetworkRequest(QUrl{baseUrl(path)});
     QHttpHeaders headers;
     headers.append(QHttpHeaders::WellKnownHeader::ContentType, "application/json");
@@ -30,15 +30,18 @@ QNetworkRequest HttpClient::requestV3(QString path) const{
 }
 
 
-QNetworkRequest HttpClient::requestV2(QString path, bool protobufContent) const{
+QNetworkRequest HttpClient::requestV2(const QString& path, const QString& type) const{
     auto request = QNetworkRequest(QUrl{baseUrl(path)});
     QHttpHeaders headers;
-    if (protobufContent) {
-        headers.append(QHttpHeaders::WellKnownHeader::ContentType, "application/vnd.kafka.protobuf.v2+json");
-        headers.append(QHttpHeaders::WellKnownHeader::Accept, "application/vnd.kafka.protobuf.v2+json");
-    } else {
-        headers.append(QHttpHeaders::WellKnownHeader::ContentType, "application/vnd.kafka.v2+json");
+    auto contentType = QString("application/vnd.kafka");
+    if (!type.isEmpty()) {
+        contentType += ".";
+        contentType += type;
     }
+    contentType += ".v2+json";
+
+    headers.append(QHttpHeaders::WellKnownHeader::ContentType, contentType);
+    headers.append(QHttpHeaders::WellKnownHeader::Accept, contentType);
     request.setHeaders(headers);
     return request;
 }

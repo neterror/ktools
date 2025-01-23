@@ -3,6 +3,8 @@
 #include "kafka_messages.h"
 #include <QStateMachine>
 #include <QObject>
+#include <qjsondocument.h>
+#include <qstringview.h>
 
 class KafkaConsumer : public QObject {
     Q_OBJECT
@@ -20,7 +22,8 @@ public:
     void start();
     void stop();
 signals:
-    void received(InputMessage message);
+    void receivedJson(InputMessage<QJsonDocument> message);
+    void receivedBinary(InputMessage<QByteArray> message);
     void commitOffset();
     void readAgain();
     void stopRequest();
