@@ -62,13 +62,18 @@ void KafkaProxyV2::deleteInstanceId() {
     });
 }
 
-void KafkaProxyV2::subscribe(const QString& topic) {
+void KafkaProxyV2::subscribe(const QStringList& topics) {
     qDebug().noquote() << "Joining consumer group" << mGroupName << "instance" << mInstanceId;
 
     //1. Subscribe for a topic
     auto url = QString("consumers/%1/instances/%2/subscription").arg(mGroupName).arg(mInstanceId);
+
+    auto array = QJsonArray();
+    for(const auto& topic: topics) {
+        array << topic;
+    }
     auto obj = QJsonObject {
-        {"topics", QJsonArray{topic}}
+        {"topics", array}
     };
 
     mRest.post(requestV2(url), QJsonDocument{obj}, this, [this,url](QRestReply &reply) {
@@ -84,6 +89,7 @@ void KafkaProxyV2::subscribe(const QString& topic) {
                 emit failed("failed to subscribe");
             }
             auto obj = json->object();
+            qDebug() << obj;
             auto topics = obj["topics"].toArray();
             QString subscription;
             bool ok;
@@ -91,6 +97,7 @@ void KafkaProxyV2::subscribe(const QString& topic) {
                 if (!subscription.isEmpty()) subscription += ", ";
                 subscription += t.toString();
             }
+            qDebug() << "listen on topics" << subscription;
             emit subscribed(subscription);
         });
     });
@@ -122,22 +129,26 @@ void KafkaProxyV2::getRecords() {
             return;
         }
 
-        qint32 lastOffset = -1;
         for (const auto& item: json->array()) {
+            auto obj = item.toObject();
             if (mMediaType == kMediaProtobuf) {
-                lastOffset = reportInputJson(item.toObject());
+                reportInputJson(obj);
             } else if (mMediaType == kMediaBinary) {
-                lastOffset = reportInputBinary(item.toObject());
+                reportInputBinary(obj);
             } else {
                 qWarning() << "invalid media type";
+                continue;
             }
-        }
 
-        emit receivedOffset(lastOffset);
+            auto offset = obj["offset"].toInt();
+            auto topic = obj["topic"].toString();
+
+            emit receivedOffset(topic,offset);
+        }
     });
 }
 
-qint32 KafkaProxyV2::reportInputJson(const QJsonObject& obj) {
+void KafkaProxyV2::reportInputJson(const QJsonObject& obj) {
     InputMessage<QJsonDocument> input;
     input.key = obj["key"].toString();
     input.offset = obj["offset"].toInt();
@@ -145,10 +156,9 @@ qint32 KafkaProxyV2::reportInputJson(const QJsonObject& obj) {
     input.topic = obj["topic"].toString();
     input.value = QJsonDocument{obj["value"].toObject()};
     emit receivedJson(input);
-    return input.offset;
 }
 
-qint32 KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
+void KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     InputMessage<QByteArray> input;
     input.key = obj["key"].toString();
     input.offset = obj["offset"].toInt();
@@ -156,7 +166,6 @@ qint32 KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     input.topic = obj["topic"].toString();
     input.value = QByteArray::fromBase64(obj["topic"].toString().toUtf8());
     emit receivedBinary(input);
-    return input.offset;
 }
 
 

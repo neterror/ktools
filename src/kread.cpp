@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     parser.addHelpOption();
     parser.addOptions({
             {"group", "group name", "group"},
-            {"topic", "listen on topic pattern", "topic-name"},
+            {"topics", "comma separated list of topics to listen", "list of topics"},
             {"media-type",  "protobuf or binary format", "type", kMediaProtobuf}
     });
     parser.process(app);
@@ -69,13 +69,14 @@ int main(int argc, char** argv) {
     qDebug().noquote() << "Connecting to server" << server;
     
     KafkaProxyV2 v2(server, user, password, parser.value("media-type"));
-    KafkaConsumer consumer(v2, parser.value("group"), parser.value("topic"));
+    auto topics = parser.value("topics").trimmed();
+    KafkaConsumer consumer(v2, parser.value("group"), topics.split(","));
 
     _consumer = &consumer;
     signal(SIGINT, cleanExit);
     signal(SIGTERM, cleanExit);
     
-    if (!parser.isSet("group") || !parser.isSet("topic")) {
+    if (!parser.isSet("group") || !parser.isSet("topics")) {
         parser.showHelp();
     }
 

@@ -11,10 +11,8 @@ class KafkaProxyV2 : public HttpClient {
     QString mGroupName;
     QString mMediaType;
     QNetworkReply* mPendingRead {nullptr};
-
-    qint32 reportInputJson(const QJsonObject& obj);
-    qint32 reportInputBinary(const QJsonObject& obj);
-    
+    void reportInputJson(const QJsonObject& obj);
+    void reportInputBinary(const QJsonObject& obj);
 public:
 
     QString instanceId() const {return mInstanceId;}
@@ -22,7 +20,7 @@ public:
 
     KafkaProxyV2(QString server, QString user, QString password, QString mediaType = "");
     void requestInstanceId(const QString& groupName);
-    void subscribe(const QString& topic);
+    void subscribe(const QStringList& topic);
     void getRecords();
     void stopReading();
 
@@ -35,8 +33,8 @@ signals:
     void finished(QString message);
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(InputMessage<QByteArray> message);
+    void receivedOffset(QString topic, qint32 offset);
 
     void failed(QString message);
-    void receivedOffset(qint32 offset);
     void offsetCommitted();
 };
