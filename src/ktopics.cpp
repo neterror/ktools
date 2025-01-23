@@ -2,6 +2,7 @@
 #include <qcommandlineparser.h>
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
+#include <qregularexpression.h>
 #include "kafka_proxy_v3.h"
 #include "topics_delete.h"
 
@@ -14,13 +15,21 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 }
 
 
-void listTopics(KafkaProxyV3& v3) {
-    QObject::connect(&v3, &KafkaProxyV3::topicList, [](QList<KafkaProxyV3::Topic> topics){
+void listTopics(KafkaProxyV3& v3, const QString& pattern) {
+
+    QObject::connect(&v3, &KafkaProxyV3::topicList, [pattern](QList<KafkaProxyV3::Topic> topics){
+        QRegularExpression regex;
+        if (!pattern.isEmpty()) {
+            regex.setPattern(pattern);
+        }
+
         auto columns = QList<int>{30};
         printTableRow({"Topic"}, columns);
         qDebug().noquote() << "----------------------------------------";
         for (const auto& topic: topics) {
-            printTableRow({topic.name}, columns);
+            if (!regex.isValid() || regex.match(topic.name).hasMatch()) {
+                printTableRow({topic.name}, columns);
+            }
         }
         QCoreApplication::quit();
     });
@@ -94,9 +103,15 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
     parser.process(app);
     
     if (parser.isSet("list")) {
-        listTopics(v3);
+        listTopics(v3, "");
         return;
     }
+
+    if (parser.isSet("pattern")) {
+        listTopics(v3, parser.value("pattern"));
+        return;
+    }
+    
 
     if (parser.isSet("config")) {
         readTopicConfig(v3, parser.value("config"));
@@ -140,6 +155,7 @@ int main(int argc, char** argv) {
     parser.addHelpOption();
     parser.addOptions({
             {"list", "get the topics"},
+            {"pattern", "get the topics", "pattern", "."},
             {"config", "read topic details", "topic-name"},
             {"create", "create topic", "topic-name"},
             {"delete", "delete topic", "topic-name"},
