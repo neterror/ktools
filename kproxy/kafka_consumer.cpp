@@ -27,8 +27,7 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList top
     init->addTransition(&mKafkaProxy, &KafkaProxyV2::obtainedInstanceId, subscribe);
     subscribe->addTransition(&mKafkaProxy, &KafkaProxyV2::subscribed, read);
 
-    read->addTransition(&mKafkaProxy, &KafkaProxyV2::offsetCommitted, read);
-    read->addTransition(this, &KafkaConsumer::readAgain, read);
+    read->addTransition(&mKafkaProxy, &KafkaProxyV2::readingComplete, read);
 
     //and report the receive message 
     connect(&mKafkaProxy, &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
@@ -38,8 +37,6 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList top
     connect(&mKafkaProxy, &KafkaProxyV2::receivedOffset, [this](QString topic, qint32 offset) {
         if (offset != -1) {
             mKafkaProxy.commitOffset(topic, offset);
-        } else {
-            emit readAgain();
         }
     });
 

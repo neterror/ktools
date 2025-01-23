@@ -12,7 +12,7 @@ class KafkaConsumer : public QObject {
     QStateMachine mSM;
     QStringList mTopics;
     QString mGroup;
-
+    QString generateRandomId();
 private slots:
     void onSuccess();
     void onFailed();
@@ -23,7 +23,6 @@ public:
 signals:
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(InputMessage<QByteArray> message);
-    void readAgain();
     void stopRequest();
     void finished(QString message);
 };

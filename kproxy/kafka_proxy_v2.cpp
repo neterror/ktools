@@ -12,10 +12,21 @@ KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, QStri
 }
 
 
-void KafkaProxyV2::requestInstanceId(const QString& groupName) {
-    auto url = QString("consumers/%1").arg(groupName);
+QString KafkaProxyV2::generateRandomId() {
+    auto epoch = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+    return QString("kproxy-%1").arg(epoch);
+}
+
+
+void KafkaProxyV2::requestInstanceId(QString groupName) {
+    mGroupName = std::move(groupName);
+    auto consumerId = generateRandomId();
+    
+    qDebug().noquote() << "requestInstanceId with group" << mGroupName << "clientId" << consumerId;
+    auto url = QString("consumers/%1").arg(mGroupName);
     auto json = QJsonObject {
         {"format", mMediaType},
+        {"name", consumerId},
 
         {"fetch.min.bytes", 1}, //when at least 1 byte is available - report it immediately, don't wait the timeout
         {"consumer.request.timeout.ms", 10000},
@@ -26,7 +37,6 @@ void KafkaProxyV2::requestInstanceId(const QString& groupName) {
         {"auto.commit.enable", false} //explicitly set which messages are processed
     };
 
-    mGroupName = groupName;
     mRest.post(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
         auto json = reply.readJson();
         if (!json || !json->isObject()) {
@@ -63,9 +73,6 @@ void KafkaProxyV2::deleteInstanceId() {
 }
 
 void KafkaProxyV2::subscribe(const QStringList& topics) {
-    qDebug().noquote() << "Joining consumer group" << mGroupName << "instance" << mInstanceId;
-
-    //1. Subscribe for a topic
     auto url = QString("consumers/%1/instances/%2/subscription").arg(mGroupName).arg(mInstanceId);
 
     auto array = QJsonArray();
@@ -97,7 +104,6 @@ void KafkaProxyV2::subscribe(const QStringList& topics) {
                 if (!subscription.isEmpty()) subscription += ", ";
                 subscription += t.toString();
             }
-            qDebug() << "listen on topics" << subscription;
             emit subscribed(subscription);
         });
     });
@@ -113,7 +119,10 @@ void KafkaProxyV2::stopReading() {
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
+    qDebug().noquote() << "KafkaProxyV2::getRecords() invoked";
     mPendingRead = mRest.get(requestV2(url,mMediaType), this, [this](QRestReply& reply){
+        qDebug() << "getRecords complete";
+
         if (!mPendingRead->isReadable()) {
             mPendingRead = nullptr;
             return;
@@ -145,6 +154,8 @@ void KafkaProxyV2::getRecords() {
 
             emit receivedOffset(topic,offset);
         }
+        emit readingComplete();
+
     });
 }
 

@@ -56,6 +56,8 @@ void KafkaProxyV3::listTopics() {
             result.emplaceBack(Topic{
                     obj["topic_name"].toString(),
                     obj["is_internal"].toBool(),
+                    obj["partitions_count"].toInt(),
+                    obj["replication_factor"].toInt()
                 });
         }
         emit topicList(result);
@@ -90,10 +92,11 @@ void KafkaProxyV3::readTopicConfig(const QString& name) {
 }
 
 
-void KafkaProxyV3::createTopic(const QString& topic, bool isCompact, qint32 replicationFactor) {
+void KafkaProxyV3::createTopic(const QString& topic, bool isCompact, qint32 replicationFactor, qint32 partitionsCount) {
     auto payload = QJsonObject {
         {"topic_name", topic},
-        {"replication_factor", replicationFactor}
+        {"replication_factor", replicationFactor},
+        {"partitions_count", partitionsCount}
     };
 
     QJsonArray configs;

@@ -14,6 +14,7 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
     qDebug().noquote() << formattedRow; // Prevent additional quotes in QDebug output
 }
 
+inline QString toStr(qint32 num) {return QString("%1").arg(num);}
 
 void listTopics(KafkaProxyV3& v3, const QString& pattern) {
 
@@ -23,12 +24,12 @@ void listTopics(KafkaProxyV3& v3, const QString& pattern) {
             regex.setPattern(pattern);
         }
 
-        auto columns = QList<int>{30};
-        printTableRow({"Topic"}, columns);
-        qDebug().noquote() << "----------------------------------------";
+        auto columns = QList<int>{40,10,5};
+        printTableRow({"topic", "parts", "replication-factor"}, columns);
+        qDebug().noquote() << "------------------------------------------------------------------------";
         for (const auto& topic: topics) {
             if (!regex.isValid() || regex.match(topic.name).hasMatch()) {
-                printTableRow({topic.name}, columns);
+                printTableRow({topic.name, toStr(topic.partitionsCount), toStr(topic.replicationFactor)}, columns);
             }
         }
         QCoreApplication::quit();
@@ -55,12 +56,12 @@ void readTopicConfig(KafkaProxyV3& v3, const QString& topic) {
 }
 
 
-void createTopic(KafkaProxyV3& v3, const QString& name, bool isCompact, qint32 replicationFactor) {
+void createTopic(KafkaProxyV3& v3, const QString& name, bool isCompact, qint32 replicationFactor, qint32 partitionsCount) {
     QObject::connect(&v3, &KafkaProxyV3::topicCreated, [name] {
         qDebug().noquote() << "topic" << name << "is created";
         QCoreApplication::quit();
     });
-    v3.createTopic(name, isCompact, replicationFactor);
+    v3.createTopic(name, isCompact, replicationFactor, partitionsCount);
 }
 
 
@@ -120,11 +121,9 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplicat
 
 
     if (parser.isSet("create")) {
-        auto replicationFactor = 1;
-        if (parser.isSet("set-replication-factor")) {
-            replicationFactor = parser.value("set-replication-factor").toInt();
-        }
-        createTopic(v3, parser.value("create"), parser.isSet("set-compact"), replicationFactor);
+        auto replicationFactor = parser.value("set-replication-factor").toInt();
+        auto partitionsCount = parser.value("set-partitions-count").toInt();
+        createTopic(v3, parser.value("create"), parser.isSet("set-compact"), replicationFactor, partitionsCount);
         return;
     }
 
@@ -161,7 +160,9 @@ int main(int argc, char** argv) {
             {"delete", "delete topic", "topic-name"},
             {"delete-many", "delete multiple topics matching the pattern", "pattern"},
             {"set-compact", "set cleanup.policy = true"},
-            {"set-replication-factor", "set topic-replication", "replication-factor"},
+
+            {"set-replication-factor", "set topic-replication factor. defaults to 1", "replication-factor", "1"},
+            {"set-partitions-count", "specify partitions count. defaults to 1", "partitions", "1"},
     });
 
     QSettings settings;

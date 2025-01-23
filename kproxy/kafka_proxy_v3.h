@@ -63,7 +63,7 @@ public:
     void listGroups();
     void readTopicConfig(const QString& name);
     
-    void createTopic(const QString& topic, bool isCompact, qint32 replicationFactor);
+    void createTopic(const QString& topic, bool isCompact, qint32 replicationFactor, qint32 partitionsCount);
     void deleteTopic(const QString& topic);
 
     void sendMessage(const QString& key, const QString& topic, const QJsonDocument& json);
