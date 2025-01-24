@@ -12,21 +12,12 @@ KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, QStri
 }
 
 
-QString KafkaProxyV2::generateRandomId() {
-    auto epoch = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
-    return QString("kproxy-%1").arg(epoch);
-}
-
-
 void KafkaProxyV2::requestInstanceId(QString groupName) {
     mGroupName = std::move(groupName);
-    auto consumerId = generateRandomId();
-    
-    qDebug().noquote() << "requestInstanceId with group" << mGroupName << "clientId" << consumerId;
+    qDebug().noquote() << "requestInstanceId with group" << mGroupName;
     auto url = QString("consumers/%1").arg(mGroupName);
     auto json = QJsonObject {
         {"format", mMediaType},
-        {"name", consumerId},
 
         {"fetch.min.bytes", 1}, //when at least 1 byte is available - report it immediately, don't wait the timeout
         {"consumer.request.timeout.ms", 10000},

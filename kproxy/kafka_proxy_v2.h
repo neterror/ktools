@@ -13,7 +13,6 @@ class KafkaProxyV2 : public HttpClient {
     QNetworkReply* mPendingRead {nullptr};
     void reportInputJson(const QJsonObject& obj);
     void reportInputBinary(const QJsonObject& obj);
-    QString generateRandomId();
 public:
 
     QString instanceId() const {return mInstanceId;}
