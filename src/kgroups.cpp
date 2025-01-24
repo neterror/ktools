@@ -16,11 +16,11 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 
 void listGroups(KafkaProxyV3& v3) {
     QObject::connect(&v3, &KafkaProxyV3::groupList, [](auto groups){
-        printTableRow({"GroupID", "State"}, {30, 10});
-        qDebug().noquote() << "----------------------------------------";
+        printTableRow({"GroupID", "State"}, {40, 10});
+        qDebug().noquote() << "-------------------------------------------------";
 
         for (const auto& group: groups) {
-            printTableRow({group.name, group.state}, {30, 10});
+            printTableRow({group.name, group.state}, {40, 10});
         }
         QCoreApplication::quit();
     });
@@ -29,8 +29,8 @@ void listGroups(KafkaProxyV3& v3) {
 
 void listConsumers(KafkaProxyV3& v3, const QString& groupName) {
     QObject::connect(&v3, &KafkaProxyV3::consumerList, [](auto result){
-        printTableRow({"GroupID", "ConsumerID", "ClientID"}, {30, 40, 40});
-        qDebug().noquote() << "----------------------------------------";
+        printTableRow({"GroupID", "ConsumerID", "ClientID"}, {40, 40, 40});
+        qDebug().noquote() << "-----------------------------------------------";
 
         for (const auto& consumer: result) {
             qDebug().noquote() << "groupId:    " << consumer.groupId;
