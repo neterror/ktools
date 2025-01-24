@@ -87,7 +87,6 @@ void KafkaProxyV2::subscribe(const QStringList& topics) {
                 emit failed("failed to subscribe");
             }
             auto obj = json->object();
-            qDebug() << obj;
             auto topics = obj["topics"].toArray();
             QString subscription;
             bool ok;
@@ -110,10 +109,7 @@ void KafkaProxyV2::stopReading() {
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
-    qDebug().noquote() << "KafkaProxyV2::getRecords() invoked";
     mPendingRead = mRest.get(requestV2(url,mMediaType), this, [this](QRestReply& reply){
-        qDebug() << "getRecords complete";
-
         if (!mPendingRead->isReadable()) {
             mPendingRead = nullptr;
             return;
@@ -166,7 +162,8 @@ void KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     input.offset = obj["offset"].toInt();
     input.partition = obj["partition"].toInt();
     input.topic = obj["topic"].toString();
-    input.value = QByteArray::fromBase64(obj["topic"].toString().toUtf8());
+    input.value = QByteArray::fromBase64(obj["value"].toString().toUtf8());
+
     emit receivedBinary(input);
 }
 
