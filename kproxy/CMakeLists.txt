@@ -30,6 +30,7 @@ target_link_libraries(kproxy PUBLIC Qt6::Core Qt6::Network Qt6::StateMachine)
 
 
 set_target_properties(kproxy PROPERTIES PUBLIC_HEADER "${HEADERS}")
+set_target_properties(kproxy PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 install(TARGETS kproxy
   EXPORT kproxyTargets
