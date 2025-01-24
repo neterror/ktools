@@ -11,7 +11,7 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList top
     auto error = new QFinalState(&mSM);
 
     work->addTransition(this, &KafkaConsumer::stopRequest, success);
-    work->addTransition(&mKafkaProxy, &KafkaProxyV2::failed, error);
+    work->addTransition(this, &KafkaConsumer::failed, error);
 
     auto init = new QState(work);        //request instanceID
     auto subscribe = new QState(work);   //subscribe to the topic
@@ -38,6 +38,11 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList top
         if (offset != -1) {
             mKafkaProxy.commitOffset(topic, offset);
         }
+    });
+
+    connect(&mKafkaProxy, &KafkaProxyV2::failed, [this](QString error){
+        qWarning().noquote() << "KafkaProxyV2 error:" << error;
+        emit failed();
     });
 
 

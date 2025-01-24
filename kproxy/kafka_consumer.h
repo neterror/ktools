@@ -21,6 +21,7 @@ public:
     void start();
     void stop();
 signals:
+    void failed();
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(InputMessage<QByteArray> message);
     void stopRequest();
