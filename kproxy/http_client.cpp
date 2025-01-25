@@ -23,6 +23,7 @@ QString HttpClient::baseUrl(const QString& path) const {
 QNetworkRequest HttpClient::requestV3(const QString& path) const{
     auto request = QNetworkRequest(QUrl{baseUrl(path)});
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Accept", "application/json");
     return request;
 }
 
@@ -37,6 +38,7 @@ QNetworkRequest HttpClient::requestV2(const QString& path, const QString& type) 
     }
     contentType += ".v2+json";
     request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
+    request.setRawHeader("Accept", contentType.toUtf8());
     return request;
 }
 
