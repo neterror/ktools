@@ -16,6 +16,8 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
     mGroupName = std::move(groupName);
     qDebug().noquote() << "requestInstanceId with group" << mGroupName;
     auto url = QString("consumers/%1").arg(mGroupName);
+    qDebug() << "create instance of media type:" << mMediaType;
+
     auto json = QJsonObject {
         {"format", mMediaType},
 
@@ -28,7 +30,7 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
         {"auto.commit.enable", false} //explicitly set which messages are processed
     };
 
-    mRest.post(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
+    mRest.post(requestV2(url, mMediaType), QJsonDocument{json}, this, [this](QRestReply &reply) {
         auto json = reply.readJson();
         if (!json || !json->isObject()) {
             emit failed("Failed to obtain instanceId");

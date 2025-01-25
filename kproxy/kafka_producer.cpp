@@ -35,7 +35,7 @@ void KafkaProducer::onSend() {
         return;
     }
     auto data = mQueue.dequeue();
-    mProxy.sendMessage(data.topic, data.key, data.value);
+    mProxy.sendMessage(data.key, data.topic, data.value);
 }
 
 void KafkaProducer::send(OutputMessage data) {
