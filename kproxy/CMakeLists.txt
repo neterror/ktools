@@ -1,7 +1,7 @@
 set(HEADERS
   http_client.h
   kafka_consumer.h
-  kafka_producer.h
+  kafka_protobuf_producer.h
   kafka_messages.h
   kafka_proxy_v2.h
   kafka_proxy_v3.h
@@ -14,7 +14,7 @@ set(HEADERS
 add_library(kproxy STATIC
   http_client.cpp
   kafka_consumer.cpp
-  kafka_producer.cpp
+  kafka_protobuf_producer.cpp
   kafka_proxy_v2.cpp
   kafka_proxy_v3.cpp
   schema_registry.cpp

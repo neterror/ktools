@@ -20,7 +20,13 @@ struct InputMessage {
 
 
 
-struct OutputMessage {
+struct OutputBinaryMessage {
+    QString key;
+    QString topic;
+    QByteArray value;
+};
+
+struct OutputJsonMessage {
     QString key;
     QString topic;
     QJsonDocument value;

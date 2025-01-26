@@ -2,7 +2,7 @@
 #include <qcommandlineparser.h>
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
-#include "kafka_producer.h"
+#include "kafka_protobuf_producer.h"
 #include "kafka_proxy_v3.h"
 #include "stdin_reader.h"
 
@@ -30,7 +30,12 @@ void sendJson(KafkaProxyV3& v3, const QString& key, const QString& topic, const 
 }
 
 
-void sendBinary(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& binaryFile, const QString& schemaId) {
+void sendBinary(KafkaProxyV3& v3,
+                const QString& key,
+                const QString& topic,
+                const QString& binaryFile,
+                const QString& schemaId)
+{
     QFile f(binaryFile);
     if (!f.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open" << binaryFile;
@@ -44,25 +49,27 @@ void sendBinary(KafkaProxyV3& v3, const QString& key, const QString& topic, cons
     });
 }
 
-void interactiveMode(KafkaProxyV3& v3, StdinReader& reader, const QString& topic, const QString& key) {
-    auto producer = std::make_shared<KafkaProducer>(v3);
-    QObject::connect(&reader, &StdinReader::data, [producer, &reader, topic, key](QString line) {
-        if (line == "end") {
-            qDebug().noquote() << "terminating";
-            QObject::disconnect(&reader, nullptr, nullptr, nullptr);
-            QCoreApplication::quit();
-            return;
-        }
-        QJsonParseError error;
-        auto doc = QJsonDocument::fromJson(line.toUtf8(), &error);
-        if (doc.isObject()) {
-            qDebug() << "sending on topic " << topic;
-            producer->send({key, topic, doc});
-        } else {
-            qWarning().noquote() << error.errorString();
-        }
 
+bool sendProtobuf(const QString& key, const QString& topic, const QString& protofile) {
+    QFile f(protofile);
+    if (!f.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open" << protofile;
+        return false;
+    }
+    auto value = f.readAll();
+    auto producer = std::make_shared<KafkaProtobufProducer>();
+    QObject::connect(producer.get(), &KafkaProtobufProducer::failed, [](const QString& message){
+        qWarning().noquote() << message;
+        QCoreApplication::quit();
     });
+
+    QObject::connect(producer.get(), &KafkaProtobufProducer::messageSent, [producer]{
+        qWarning().noquote() << "message sent";
+        QCoreApplication::quit();
+    });
+
+    producer->send({key, topic, value});
+    return true;
 }
 
 
@@ -81,11 +88,6 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, StdinReader& 
         return;
     }
     
-    if (parser.isSet("interactive")) {
-        interactiveMode(v3, reader, parser.value("topic"), parser.value("key"));
-        return;
-    }
-
     parser.showHelp();
 }
 
@@ -104,16 +106,24 @@ int main(int argc, char** argv) {
             {"binary", "send binary data", "binary"},
             {"schemaId", "append schemaId to the binary data", "schemaId", "-1"},
             
-            {"interactive", "read for json input on stdin"}
+            {"protobuf", "send protobuf binary file", "protobuf"}
     });
+
+    parser.process(app);
+    if (parser.isSet("protobuf") && parser.isSet("topic")) {
+        bool sent = sendProtobuf(parser.value("key"), parser.value("topic"), parser.value("protobuf"));
+        if (sent) {
+            return app.exec();
+        } else {
+            return -1;
+        }
+    }
 
     QSettings settings;
     auto server = settings.value("ConfluentRestProxy/server").toString();
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
-    qDebug().noquote() << "Connecting to server" << server;
 
-    parser.process(app);
     KafkaProxyV3 v3(server, user, password);
     StdinReader reader;
     QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app, &reader](QString clusterId){
