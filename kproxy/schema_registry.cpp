@@ -98,7 +98,7 @@ void SchemaRegistry::deleteSchema(const QString& subject, qint32 version) {
     QString url = QString("subjects/%1/versions/%2").arg(subject).arg(version);
     auto reply = mRest.deleteResource(requestV3(url), this, [this,subject,version](QRestReply &reply) {
         auto json = reply.readJson();
-        if (json || json->isObject()) {
+        if (json && json->isObject()) {
             auto obj = json->object();
             if (obj.contains("error_code")) {
                 qWarning() << "schema deletion failed:" << obj["message"].toString();
