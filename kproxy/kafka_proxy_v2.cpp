@@ -164,11 +164,35 @@ void KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     input.offset = obj["offset"].toInt();
     input.partition = obj["partition"].toInt();
     input.topic = obj["topic"].toString();
-    input.value = QByteArray::fromBase64(obj["value"].toString().toUtf8());
+    auto value = QByteArray::fromBase64(obj["value"].toString().toUtf8());
 
-    emit receivedBinary(input);
+    qint32 schemaId;
+    if (isValid(value, schemaId)) {
+        input.value = value.mid(6);
+        emit receivedBinary(schemaId, input);
+    }
 }
 
+
+bool KafkaProxyV2::isValid(const QByteArray& data, qint32& schemaId) {
+    schemaId = -1;
+    if (data.size() < 5) {
+        qWarning() << "invalid input data size";
+        return false;
+    }
+    auto b = (const quint8*)data.data();
+    if (b[0] != 0) {
+        qWarning() << "invalid magic byte";
+        return false;
+    }
+
+    if (b[5] != 0) {
+        qWarning() << "Unexpected b[5]";
+        return false;
+    }
+    schemaId = (b[1] << 24) | (b[2] << 16) | (b[3] << 8) | (b[4] << 0);
+    return true;
+}
 
 
 void KafkaProxyV2::commitOffset(QString topic, qint32 offset) {

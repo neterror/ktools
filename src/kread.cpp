@@ -35,8 +35,16 @@ static void receivedJson(const InputMessage<QJsonDocument>& message) {
     printf("%s\n\n", output.toStdString().c_str());
 }
 
-static void receivedBinary(const InputMessage<QByteArray>& message) {
-    qDebug() << "incoming binary message" << message.value << "from topic " << message.topic;
+static void receivedBinary(qint32 schemaId, const InputMessage<QByteArray>& message) {
+    static int counter = 0;
+    qDebug() << "schemaId = " << schemaId;
+    auto name = QString("msg%1_schema_id%2_topic_%3.bin").arg(message.offset).arg(schemaId).arg(message.topic);
+    QFile f(name);
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(message.value);
+        f.close();
+        qDebug().noquote() << "binary message in" << name;
+    }
 }
 
 
@@ -86,7 +94,7 @@ int main(int argc, char** argv) {
     });
 
     QObject::connect(&consumer, &KafkaConsumer::receivedJson, [](auto message) {receivedJson(message);});
-    QObject::connect(&consumer, &KafkaConsumer::receivedBinary, [](auto message) {receivedBinary(message);});
+    QObject::connect(&consumer, &KafkaConsumer::receivedBinary, [](auto schemaId, auto message) {receivedBinary(schemaId, message);});
     QObject::connect(&consumer, &KafkaConsumer::finished, [] {
         QCoreApplication::quit();
     });

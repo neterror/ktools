@@ -23,7 +23,7 @@ public:
 signals:
     void failed();
     void receivedJson(InputMessage<QJsonDocument> message);
-    void receivedBinary(InputMessage<QByteArray> message);
+    void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
     void stopRequest();
     void finished(QString message);
 };

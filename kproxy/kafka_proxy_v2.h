@@ -13,6 +13,7 @@ class KafkaProxyV2 : public HttpClient {
     QNetworkReply* mPendingRead {nullptr};
     void reportInputJson(const QJsonObject& obj);
     void reportInputBinary(const QJsonObject& obj);
+    bool isValid(const QByteArray& data, qint32& schemaId);
 public:
 
     QString instanceId() const {return mInstanceId;}
@@ -32,7 +33,7 @@ signals:
     void subscribed(QString topics);
     void finished(QString message);
     void receivedJson(InputMessage<QJsonDocument> message);
-    void receivedBinary(InputMessage<QByteArray> message);
+    void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
     void receivedOffset(QString topic, qint32 offset);
     void readingComplete();
 
