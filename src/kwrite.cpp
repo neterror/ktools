@@ -7,7 +7,7 @@
 #include "stdin_reader.h"
 
 
-void sendMessage(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& fileName) {
+void sendJson(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& fileName) {
     QFile f(fileName);
     if (!f.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open" << fileName;
@@ -22,7 +22,22 @@ void sendMessage(KafkaProxyV3& v3, const QString& key, const QString& topic, con
         return;
     }
 
-    v3.sendMessage(key, topic, doc);
+    v3.sendJson(key, topic, doc);
+    QObject::connect(&v3, &KafkaProxyV3::messageSent, [] {
+        qDebug().noquote() << "Success. Data sent";
+        QCoreApplication::quit();
+    });
+}
+
+
+void sendBinary(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& binaryFile, const QString& schemaId) {
+    QFile f(binaryFile);
+    if (!f.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open" << binaryFile;
+        QCoreApplication::quit();
+        return;
+    }
+    v3.sendProtobuf(key, topic, schemaId.toInt(), f.readAll());
     QObject::connect(&v3, &KafkaProxyV3::messageSent, [] {
         qDebug().noquote() << "Success. Data sent";
         QCoreApplication::quit();
@@ -56,11 +71,16 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, StdinReader& 
         parser.showHelp();
     }
 
-    if (parser.isSet("file")) {
-        sendMessage(v3, parser.value("key"), parser.value("topic"), parser.value("file"));
+    if (parser.isSet("json")) {
+        sendJson(v3, parser.value("key"), parser.value("topic"), parser.value("json"));
         return;
     }
 
+    if (parser.isSet("binary")) {
+        sendBinary(v3, parser.value("key"), parser.value("topic"), parser.value("binary"), parser.value("schemaId"));
+        return;
+    }
+    
     if (parser.isSet("interactive")) {
         interactiveMode(v3, reader, parser.value("topic"), parser.value("key"));
         return;
@@ -80,7 +100,10 @@ int main(int argc, char** argv) {
     parser.addOptions({
             {"topic", "topic on which to send data", "send-topic"},
             {"key",   "kafka topic key", "topic-key"},
-            {"file", "send json data", "json-file"},
+            {"json", "send json data", "json-file"},
+            {"binary", "send binary data", "binary"},
+            {"schemaId", "append schemaId to the binary data", "schemaId", "-1"},
+            
             {"interactive", "read for json input on stdin"}
     });
 

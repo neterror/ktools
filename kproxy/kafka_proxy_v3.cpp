@@ -143,7 +143,7 @@ void KafkaProxyV3::deleteTopic(const QString& topic) {
 
 
 
-void KafkaProxyV3::sendMessage(const QString& key, const QString& topic, const QJsonDocument& json) {
+void KafkaProxyV3::sendJson(const QString& key, const QString& topic, const QJsonDocument& json) {
     auto url = QString("v3/clusters/%1/topics/%2/records").arg(mClusterID).arg(topic);
     QJsonObject payload;
     if (!key.isEmpty()) {
@@ -157,6 +157,50 @@ void KafkaProxyV3::sendMessage(const QString& key, const QString& topic, const Q
         {"data", json.object()}
     };
     
+    mRest.post(requestV3(url), QJsonDocument(payload), this, [this](QRestReply &reply) {
+        auto data = reply.readJson();
+        if (!data || !data->isObject()) {
+            emit failed("Unkown error");
+            return;
+        }
+
+        auto obj = data->object();
+        auto errorCode = obj["error_code"].toInt();
+        if (errorCode == 200) {
+            emit messageSent();
+        } else {
+            auto errorMsg = obj["message"].toString();
+            emit failed(errorMsg);
+        }
+    });
+}
+
+void KafkaProxyV3::sendProtobuf(const QString& key, const QString& topic, qint32 schemaId, const QByteArray& binary) {
+    auto url = QString("v3/clusters/%1/topics/%2/records").arg(mClusterID).arg(topic);
+    QJsonObject payload;
+    if (!key.isEmpty()) {
+        payload["key"] = QJsonObject {
+            {"type", "STRING"},
+            {"data", key}
+        };
+    }
+
+    QByteArray data;
+    if (schemaId != -1) {
+        auto header = std::array<quint8,6> {0x00, //magic
+                                            (quint8)(schemaId >> 24),
+                                            (quint8)(schemaId >> 16),
+                                            (quint8)(schemaId >> 8),
+                                            (quint8)(schemaId >> 0),
+                                            0x00}; //the first message in the proto file
+        std::copy(header.begin(), header.end(), std::back_inserter(data));
+    }
+    std::copy(binary.begin(), binary.end(), std::back_inserter(data));
+    payload["value"] = QJsonObject {
+        {"type", "BINARY"},
+        {"data", (QString)data.toBase64()}
+    };
+
     mRest.post(requestV3(url), QJsonDocument(payload), this, [this](QRestReply &reply) {
         auto data = reply.readJson();
         if (!data || !data->isObject()) {
