@@ -8,20 +8,21 @@
 
 class KafkaConsumer : public QObject {
     Q_OBJECT
-    KafkaProxyV2& mKafkaProxy;
+    std::unique_ptr<KafkaProxyV2> mProxy;
     QStateMachine mSM;
-    QStringList mTopics;
-    QString mGroup;
+
     QString generateRandomId();
+    void createProxy(const QString& mediaType);
+
 private slots:
     void onSuccess();
     void onFailed();
 public:
-    KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList topic);
+    KafkaConsumer(const QString& group, const QStringList& topics, const QString& mediaType);
     void start();
     void stop();
 signals:
-    void failed();
+    void failed(QString message);
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
     void stopRequest();

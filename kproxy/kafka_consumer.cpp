@@ -3,9 +3,10 @@
 #include <qstatemachine.h>
 #include <QFinalState>
 
-KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList topics) :
-    mKafkaProxy(proxy), mTopics{topics}, mGroup{group}
+KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, const QString& mediaType)
 {
+    createProxy(mediaType);
+
     auto work = new QState(&mSM);
     auto success = new QFinalState(&mSM);
     auto error = new QFinalState(&mSM);
@@ -17,32 +18,32 @@ KafkaConsumer::KafkaConsumer(KafkaProxyV2& proxy, QString group, QStringList top
     auto subscribe = new QState(work);   //subscribe to the topic
     auto read = new QState(work);        //read message
 
-    connect(init,      &QState::entered, [this] {mKafkaProxy.requestInstanceId(mGroup);});
-    connect(subscribe, &QState::entered, [this] {mKafkaProxy.subscribe(mTopics);});
-    connect(read,      &QState::entered, [this] {mKafkaProxy.getRecords();});
+    connect(init,      &QState::entered, [this, group] {mProxy->requestInstanceId(group);});
+    connect(subscribe, &QState::entered, [this, topics] {mProxy->subscribe(topics);});
+    connect(read,      &QState::entered, [this] {mProxy->getRecords();});
 
     connect(success,   &QState::entered, this, &KafkaConsumer::onSuccess);
     connect(error,     &QState::entered, this, &KafkaConsumer::onFailed);
 
-    init->addTransition(&mKafkaProxy, &KafkaProxyV2::obtainedInstanceId, subscribe);
-    subscribe->addTransition(&mKafkaProxy, &KafkaProxyV2::subscribed, read);
+    init->addTransition(mProxy.get(), &KafkaProxyV2::obtainedInstanceId, subscribe);
+    subscribe->addTransition(mProxy.get(), &KafkaProxyV2::subscribed, read);
 
-    read->addTransition(&mKafkaProxy, &KafkaProxyV2::readingComplete, read);
+    read->addTransition(mProxy.get(), &KafkaProxyV2::readingComplete, read);
 
     //and report the receive message 
-    connect(&mKafkaProxy, &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
-    connect(&mKafkaProxy, &KafkaProxyV2::receivedBinary, this, &KafkaConsumer::receivedBinary);
-    connect(&mKafkaProxy, &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
+    connect(mProxy.get(), &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
+    connect(mProxy.get(), &KafkaProxyV2::receivedBinary, this, &KafkaConsumer::receivedBinary);
+    connect(mProxy.get(), &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
 
-    connect(&mKafkaProxy, &KafkaProxyV2::receivedOffset, [this](QString topic, qint32 offset) {
+    connect(mProxy.get(), &KafkaProxyV2::receivedOffset, [this](QString topic, qint32 offset) {
         if (offset != -1) {
-            mKafkaProxy.commitOffset(topic, offset);
+            mProxy->commitOffset(topic, offset);
         }
     });
 
-    connect(&mKafkaProxy, &KafkaProxyV2::failed, [this](QString error){
+    connect(mProxy.get(), &KafkaProxyV2::failed, [this](QString error){
         qWarning().noquote() << "KafkaProxyV2 error:" << error;
-        emit failed();
+        emit failed(error);
     });
 
 
@@ -56,17 +57,27 @@ void KafkaConsumer::start() {
 
 void KafkaConsumer::stop() {
     qWarning().noquote() << "Stop Request";
-    mKafkaProxy.stopReading();
+    mProxy->stopReading();
     emit stopRequest();
 }
 
 
 void KafkaConsumer::onSuccess() {
     qDebug() << "KafkaConsumer success";
-    mKafkaProxy.deleteInstanceId();
+    mProxy->deleteInstanceId();
 }
 
 void KafkaConsumer::onFailed() {
     qDebug() << "KafkaConsumer failed";
-    mKafkaProxy.deleteInstanceId();
+    mProxy->deleteInstanceId();
+}
+
+
+void KafkaConsumer::createProxy(const QString& mediaType) {
+    QSettings settings;
+    auto proxyServer = settings.value("ConfluentRestProxy/server").toString();
+    auto proxyUser = settings.value("ConfluentRestProxy/user").toString();
+    auto proxyPass = settings.value("ConfluentRestProxy/password").toString();
+
+    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mediaType));
 }

@@ -4,7 +4,6 @@
 #include <qjsondocument.h>
 #include "kafka_consumer.h"
 #include "kafka_messages.h"
-#include "kafka_proxy_v2.h"
 #include <qjsonobject.h>
 #include <qstringview.h>
 #include <signal.h>
@@ -75,10 +74,9 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
     qDebug().noquote() << "Connecting to server" << server;
-    
-    KafkaProxyV2 v2(server, user, password, parser.value("media-type"));
+
     auto topics = parser.value("topics").trimmed();
-    KafkaConsumer consumer(v2, parser.value("group"), topics.split(","));
+    KafkaConsumer consumer(parser.value("group"), topics.split(","), parser.value("media-type"));
 
     _consumer = &consumer;
     signal(SIGINT, cleanExit);
@@ -89,8 +87,8 @@ int main(int argc, char** argv) {
     }
 
 
-    QObject::connect(&v2, &KafkaProxyV2::failed, [](QString error) {
-        qWarning().noquote() << error;
+    QObject::connect(&consumer, &KafkaConsumer::finished, [](QString message) {
+        qWarning().noquote() << message;
     });
 
     QObject::connect(&consumer, &KafkaConsumer::receivedJson, [](auto message) {receivedJson(message);});
