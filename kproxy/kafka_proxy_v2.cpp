@@ -20,13 +20,9 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
     auto url = QString("consumers/%1").arg(mGroupName);
     auto json = QJsonObject {
         {"format", mMediaType},
-
         {"fetch.min.bytes", 1}, //when at least 1 byte is available - report it immediately, don't wait the timeout
         {"consumer.request.timeout.ms", 10000},
-        
         {"auto.offset.reset", "earliest"},
-        {"auto.commit.enable", "false"},
-
         {"auto.commit.enable", false} //explicitly set which messages are processed
     };
 
@@ -66,6 +62,11 @@ void KafkaProxyV2::deleteInstanceId() {
             debugLog(message);
         }
         emit finished(message);
+    });
+
+    QTimer::singleShot(3000, [this]{
+        debugLog("delete instance killed after timeout");
+        emit finished("delete timeout");
     });
 }
 
