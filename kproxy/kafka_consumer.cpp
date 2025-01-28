@@ -3,9 +3,9 @@
 #include <qstatemachine.h>
 #include <QFinalState>
 
-KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, const QString& mediaType)
+KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bool verbose, const QString& mediaType)
 {
-    createProxy(mediaType);
+    createProxy(verbose, mediaType);
 
     auto work = new QState(&mSM);
     auto success = new QFinalState(&mSM);
@@ -51,33 +51,31 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, co
     work->setInitialState(init);
 }
 
+
 void KafkaConsumer::start() {
     mSM.start();
 }
 
 void KafkaConsumer::stop() {
-    qWarning().noquote() << "Stop Request";
     mProxy->stopReading();
     emit stopRequest();
 }
 
 
 void KafkaConsumer::onSuccess() {
-    qDebug() << "KafkaConsumer success";
     mProxy->deleteInstanceId();
 }
 
 void KafkaConsumer::onFailed() {
-    qDebug() << "KafkaConsumer failed";
     mProxy->deleteInstanceId();
 }
 
 
-void KafkaConsumer::createProxy(const QString& mediaType) {
+void KafkaConsumer::createProxy(bool verbose, const QString& mediaType) {
     QSettings settings;
     auto proxyServer = settings.value("ConfluentRestProxy/server").toString();
     auto proxyUser = settings.value("ConfluentRestProxy/user").toString();
     auto proxyPass = settings.value("ConfluentRestProxy/password").toString();
 
-    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mediaType));
+    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, verbose, mediaType));
 }

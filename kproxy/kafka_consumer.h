@@ -12,13 +12,12 @@ class KafkaConsumer : public QObject {
     QStateMachine mSM;
 
     QString generateRandomId();
-    void createProxy(const QString& mediaType);
-
+    void createProxy(bool verbose, const QString& mediaType);
 private slots:
     void onSuccess();
     void onFailed();
 public:
-    KafkaConsumer(const QString& group, const QStringList& topics, const QString& mediaType);
+    KafkaConsumer(const QString& group, const QStringList& topics, bool verbose, const QString& mediaType);
     void start();
     void stop();
 signals:

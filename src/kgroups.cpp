@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
             return -1;
         }
 
-        v2.reset(new KafkaProxyV2(server, user, password));
+        v2.reset(new KafkaProxyV2(server, user, password, parser.isSet("verbose")));
         QObject::connect(v2.get(), &KafkaProxyV2::obtainedInstanceId, [&v2, &parser, &app](QString instanceId){
             v2Commands(*v2, parser);
         });

@@ -5,19 +5,19 @@
 #include <qsslerror.h>
 #include <qstringview.h>
 
-KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, QString mediaType) :
+KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, bool verbose, QString mediaType) :
     HttpClient(server, user, password),
+    mVerbose{verbose},
     mMediaType(mediaType)
 {
+    mTimer.start();
 }
 
 
 void KafkaProxyV2::requestInstanceId(QString groupName) {
     mGroupName = std::move(groupName);
-    qDebug().noquote() << "requestInstanceId with group" << mGroupName;
+    debugLog(QString("requestInstanceId with group %1, mediaType %2").arg(mGroupName).arg(mMediaType));
     auto url = QString("consumers/%1").arg(mGroupName);
-    qDebug() << "create instance of media type:" << mMediaType;
-
     auto json = QJsonObject {
         {"format", mMediaType},
 
@@ -33,6 +33,7 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
     mRest.post(requestV2(url, mMediaType), QJsonDocument{json}, this, [this](QRestReply &reply) {
         auto json = reply.readJson();
         if (!json || !json->isObject()) {
+            debugLog("Failed to obtain instanceId");
             emit failed("Failed to obtain instanceId");
             return;
         }
@@ -40,34 +41,37 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
         auto obj = json->object();
         if (obj.contains("instance_id")) {
             mInstanceId = obj["instance_id"].toString();
+            debugLog(QString("obtained instanceId %1").arg(mInstanceId));
             emit obtainedInstanceId(mInstanceId);
         } else {
-            emit failed(obj["message"].toString());
+            auto msg = obj["message"].toString();
+            debugLog(QString("Failed to obtain instanceId %1").arg(msg));
+            emit failed(msg);
         }
     });
 }
 
 void KafkaProxyV2::deleteInstanceId() {
     auto url = QString("consumers/%1/instances/%2").arg(mGroupName).arg(mInstanceId);
-    qDebug().noquote() << "request to delete" << url;
+    debugLog(QString("delete instanceId %1").arg(mInstanceId));
     mRest.deleteResource(requestV2(url), this, [this](QRestReply &reply) {
         QString message;
         if (reply.isHttpStatusSuccess()) {
             message = QString("instance %1 deleted").arg(mInstanceId);
+            debugLog(QString("instanceId %1 deleted").arg(mInstanceId));
         } else {
             QStringList words;
             words << "error deleting instance" << mInstanceId << reply.readText();
             message = words.join(" ");
+            debugLog(message);
         }
-        
-        qDebug() << "instanceID" << mInstanceId << "deleted";
         emit finished(message);
     });
 }
 
 void KafkaProxyV2::subscribe(const QStringList& topics) {
     auto url = QString("consumers/%1/instances/%2/subscription").arg(mGroupName).arg(mInstanceId);
-
+    debugLog(QString("subscribe to %1").arg(topics.join(",")));
     auto array = QJsonArray();
     for(const auto& topic: topics) {
         array << topic;
@@ -78,14 +82,15 @@ void KafkaProxyV2::subscribe(const QStringList& topics) {
 
     mRest.post(requestV2(url), QJsonDocument{obj}, this, [this,url](QRestReply &reply) {
         if (!reply.isHttpStatusSuccess()) {
-            qWarning() << "failed to subscribe";
-            emit failed("failed to subscribe");
+            debugLog("failed to subscribe - bad http status");
+            emit failed("failed to subscribe - bad http status");
             return;
         }
             
         mRest.get(requestV2(url), this,[this](QRestReply& reply){
             auto json = reply.readJson();
             if (!json || !json->isObject()) {
+                debugLog("failed to subscribe - broken json");
                 emit failed("failed to subscribe");
             }
             auto obj = json->object();
@@ -96,6 +101,7 @@ void KafkaProxyV2::subscribe(const QStringList& topics) {
                 if (!subscription.isEmpty()) subscription += ", ";
                 subscription += t.toString();
             }
+            debugLog(QString("subscribed to %1").arg(subscription));
             emit subscribed(subscription);
         });
     });
@@ -103,6 +109,7 @@ void KafkaProxyV2::subscribe(const QStringList& topics) {
 
 void KafkaProxyV2::stopReading() {
     if (mPendingRead) {
+        debugLog("Stop reading request");
         mPendingRead->abort();
         mPendingRead = nullptr;
     }
@@ -111,8 +118,10 @@ void KafkaProxyV2::stopReading() {
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
+    debugLog("getRecords ");
     mPendingRead = mRest.get(requestV2(url,mMediaType), this, [this](QRestReply& reply){
         if (!mPendingRead->isReadable()) {
+            debugLog("socket not readable");
             mPendingRead = nullptr;
             return;
         }
@@ -123,6 +132,7 @@ void KafkaProxyV2::getRecords() {
                 auto obj = json->object();
                 error += obj["message"].toString();
             }
+            debugLog(error);
             emit failed(error);
             return;
         }
@@ -130,8 +140,10 @@ void KafkaProxyV2::getRecords() {
         for (const auto& item: json->array()) {
             auto obj = item.toObject();
             if (mMediaType == kMediaProtobuf) {
+                debugLog("new json message");
                 reportInputJson(obj);
             } else if (mMediaType == kMediaBinary) {
+                debugLog("new binary message");
                 reportInputBinary(obj);
             } else {
                 qWarning() << "invalid media type";
@@ -208,10 +220,11 @@ void KafkaProxyV2::commitOffset(QString topic, qint32 offset) {
     };
 
     auto url = QString("consumers/%1/instances/%2/offsets").arg(mGroupName).arg(mInstanceId);
-    mRest.post(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
+    mRest.post(requestV2(url), QJsonDocument{json}, this, [this, offset, topic](QRestReply &reply) {
         if (!reply.isHttpStatusSuccess()) {
             emit failed(QString("error %1").arg(reply.httpStatus()));
         } else {
+            debugLog(QString("committed offset %1 for topic %2").arg(offset).arg(topic));
             emit offsetCommitted();
         }
     });
@@ -233,4 +246,12 @@ void KafkaProxyV2::getOffset(const QString& group, const QString& topic) {
     mRest.get(requestV2(url), QJsonDocument{json}, this, [this](QRestReply &reply) {
         qDebug().noquote() << reply.readText();
     });
+}
+
+
+void KafkaProxyV2::debugLog(const QString& log) {
+    if (mVerbose) {
+        int elapsed = mTimer.elapsed();
+        qDebug().noquote() << QString("[%1] %2").arg(elapsed, 7, 10, QChar('0')).arg(log);
+    }
 }

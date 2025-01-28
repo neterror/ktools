@@ -3,7 +3,7 @@
 #include <qjsondocument.h>
 #include <qstringview.h>
 #include "kafka_messages.h"
-
+#include <QElapsedTimer>
 
 class KafkaProxyV2 : public HttpClient {
     Q_OBJECT
@@ -11,15 +11,19 @@ class KafkaProxyV2 : public HttpClient {
     QString mGroupName;
     QString mMediaType;
     QNetworkReply* mPendingRead {nullptr};
+    QElapsedTimer mTimer;
+    bool mVerbose;
+
     void reportInputJson(const QJsonObject& obj);
     void reportInputBinary(const QJsonObject& obj);
     bool isValid(const QByteArray& data, qint32& schemaId);
+    void debugLog(const QString& log);
 public:
 
     QString instanceId() const {return mInstanceId;}
     void deleteInstanceId();
 
-    KafkaProxyV2(QString server, QString user, QString password, QString mediaType = "");
+    KafkaProxyV2(QString server, QString user, QString password, bool verbose, QString mediaType = "");
     void requestInstanceId(QString groupName);
     void subscribe(const QStringList& topic);
     void getRecords();

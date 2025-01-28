@@ -59,7 +59,8 @@ int main(int argc, char** argv) {
     parser.addOptions({
             {"group", "group name", "group"},
             {"topics", "comma separated list of topics to listen", "list of topics"},
-            {"media-type",  "protobuf or binary format", "type", kMediaProtobuf}
+            {"media-type",  "protobuf or binary format", "type", kMediaProtobuf},
+            {"verbose", "show debug prints"}
     });
     parser.process(app);
     auto mediaType = parser.value("media-type");
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
     qDebug().noquote() << "Connecting to server" << server;
 
     auto topics = parser.value("topics").trimmed();
-    KafkaConsumer consumer(parser.value("group"), topics.split(","), parser.value("media-type"));
+    KafkaConsumer consumer(parser.value("group"), topics.split(","), parser.isSet("verbose"), parser.value("media-type"));
 
     _consumer = &consumer;
     signal(SIGINT, cleanExit);
