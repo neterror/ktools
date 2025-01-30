@@ -28,6 +28,7 @@ public:
     void stopReading();
 
     void commitOffset(QString topic, qint32 offset);
+    void commitAllOffsets();
     void getOffset(const QString& group, const QString& topic);
 
     void sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& data) override;
@@ -37,7 +38,6 @@ signals:
     void finished(QString message);
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
-    void receivedOffset(QString topic, qint32 offset);
     void readingComplete();
 
     void offsetCommitted();

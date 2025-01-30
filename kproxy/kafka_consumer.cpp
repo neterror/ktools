@@ -17,29 +17,27 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     auto init = new QState(work);        //request instanceID
     auto subscribe = new QState(work);   //subscribe to the topic
     auto read = new QState(work);        //read message
+    auto commitOffsets = new QState(work);
 
-    connect(init,      &QState::entered, [this, group] {mProxy->initialize(group);});
-    connect(subscribe, &QState::entered, [this, topics] {mProxy->subscribe(topics);});
-    connect(read,      &QState::entered, [this] {mProxy->getRecords();});
+    connect(init,          &QState::entered, [this, group] {mProxy->initialize(group);});
+    connect(subscribe,     &QState::entered, [this, topics] {mProxy->subscribe(topics);});
+    connect(read,          &QState::entered, [this] {mProxy->getRecords();});
+    connect(commitOffsets, &QState::entered, [this] {mProxy->commitAllOffsets();});
 
     connect(success,   &QState::entered, this, &KafkaConsumer::onSuccess);
     connect(error,     &QState::entered, this, &KafkaConsumer::onFailed);
 
     init->addTransition(mProxy.get(), &KafkaProxyV2::initialized, subscribe);
     subscribe->addTransition(mProxy.get(), &KafkaProxyV2::subscribed, read);
-
-    read->addTransition(mProxy.get(), &KafkaProxyV2::readingComplete, read);
+    read->addTransition(mProxy.get(), &KafkaProxyV2::readingComplete, commitOffsets);
+    commitOffsets->addTransition(mProxy.get(), &KafkaProxyV2::offsetCommitted, read);
+    
 
     //and report the receive message 
     connect(mProxy.get(), &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
     connect(mProxy.get(), &KafkaProxyV2::receivedBinary, this, &KafkaConsumer::receivedBinary);
     connect(mProxy.get(), &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
 
-    connect(mProxy.get(), &KafkaProxyV2::receivedOffset, [this](QString topic, qint32 offset) {
-        if (offset != -1) {
-            mProxy->commitOffset(topic, offset);
-        }
-    });
 
     connect(mProxy.get(), &KafkaProxyV2::failed, [this](QString error){
         qWarning().noquote() << "KafkaProxyV2 error:" << error;

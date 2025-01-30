@@ -117,8 +117,9 @@ void KafkaProxyV2::stopReading() {
 
 void KafkaProxyV2::getRecords() {
     auto url = QString("consumers/%1/instances/%2/records").arg(mGroupName).arg(mInstanceId);
-    debugLog("getRecords ");
+    debugLog(QString("getRecords: %1").arg(url));
     mPendingRead = mRest.get(requestV2(url,mMediaType), this, [this](QRestReply& reply){
+        debugLog("getRecords received data");
         if (!mPendingRead->isReadable()) {
             debugLog("socket not readable");
             mPendingRead = nullptr;
@@ -136,26 +137,30 @@ void KafkaProxyV2::getRecords() {
             return;
         }
 
+        QMap<QString, qint32> offsets;
         for (const auto& item: json->array()) {
             auto obj = item.toObject();
             if (mMediaType == kMediaProtobuf) {
-                debugLog("new json message");
                 reportInputJson(obj);
             } else if (mMediaType == kMediaBinary) {
-                debugLog("new binary message");
                 reportInputBinary(obj);
             } else {
                 qWarning() << "invalid media type";
                 continue;
             }
 
-            auto offset = obj["offset"].toInt();
-            auto topic = obj["topic"].toString();
-
-            emit receivedOffset(topic,offset);
+            if (mVerbose) {
+                auto offset = obj["offset"].toInt();
+                auto topic = obj["topic"].toString();
+                offsets[topic] = offset; //keep the last offset from a topic
+            }
+        } 
+        if (mVerbose) {
+            for (const auto& topic: offsets.keys()) {
+                debugLog(QString("received offset %1 from topic %2").arg(offsets[topic]).arg(topic));
+            }
         }
         emit readingComplete();
-
     });
 }
 
@@ -203,6 +208,16 @@ bool KafkaProxyV2::isValid(const QByteArray& data, qint32& schemaId) {
     }
     schemaId = (b[1] << 24) | (b[2] << 16) | (b[3] << 8) | (b[4] << 0);
     return true;
+}
+
+
+
+void KafkaProxyV2::commitAllOffsets() {
+    //When the post body is empty, it commits all the records that have been fetched by the consumer instance.
+    auto url = QString("consumers/%1/instances/%2/offsets").arg(mGroupName).arg(mInstanceId);
+    mRest.post(requestV2(url), QJsonDocument{}, this, [this](QRestReply &reply) {
+        emit offsetCommitted();
+    });
 }
 
 
