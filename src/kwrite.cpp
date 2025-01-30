@@ -50,17 +50,6 @@ void sendBinary(KafkaProxyV3& v3,
     });
 }
 
-QString randomId() {
-    auto now = QDateTime::currentDateTimeUtc();
-    auto epoch = now.toSecsSinceEpoch();
-    QByteArray random;
-    QFile f("/dev/random");
-    if (f.open(QIODevice::ReadOnly)) {
-        random = f.read(4);
-    }
-
-    return QString("kwrite-%1-%2").arg(random.toHex()).arg(epoch);
-}
 
 bool sendProtobuf(const QString& key, const QString& topic, const QString& protofile, bool verbose) {
     QFile f(protofile);
@@ -69,7 +58,7 @@ bool sendProtobuf(const QString& key, const QString& topic, const QString& proto
         return false;
     }
     auto value = f.readAll();
-    auto producer = std::make_shared<KafkaProtobufProducer>(randomId(), verbose);
+    auto producer = std::make_shared<KafkaProtobufProducer>(verbose);
     QObject::connect(producer.get(), &KafkaProtobufProducer::failed, [](const QString& message){
         qWarning().noquote() << message;
         QCoreApplication::quit();

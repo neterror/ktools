@@ -7,7 +7,7 @@
 #include <qstringliteral.h>
 
 
-KafkaProtobufProducer::KafkaProtobufProducer(QString groupName, bool verbose) : mGroupName{groupName}, mVerbose{verbose}
+KafkaProtobufProducer::KafkaProtobufProducer(bool verbose): mVerbose{verbose}
 {
     createObjects();
 
@@ -32,6 +32,18 @@ KafkaProtobufProducer::KafkaProtobufProducer(QString groupName, bool verbose) : 
     mSM.start();
 }
 
+QString KafkaProtobufProducer::randomId() {
+    auto now = QDateTime::currentDateTimeUtc();
+    auto epoch = now.toSecsSinceEpoch();
+    QByteArray random;
+    QFile f("/dev/random");
+    if (f.open(QIODevice::ReadOnly)) {
+        random = f.read(4);
+    }
+
+    return QString("protobuf-%1-%2").arg(random.toHex()).arg(epoch);
+}
+
 
 void KafkaProtobufProducer::onRequestSchema() {
     mTopicSchemaId.clear();
@@ -40,7 +52,7 @@ void KafkaProtobufProducer::onRequestSchema() {
 
 
 void KafkaProtobufProducer::onRequestClusterId() {
-    mProxy->initialize(mGroupName);
+    mProxy->initialize(randomId());
 }
 
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {

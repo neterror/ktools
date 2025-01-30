@@ -14,13 +14,12 @@ class KafkaProtobufProducer : public QObject {
     std::unique_ptr<SchemaRegistry> mRegistry;
 
     QStateMachine mSM;
-    QString mGroupName;
-    bool mVerbose;
     QQueue<OutputBinaryMessage> mQueue;
                         
     void createObjects();
     QMap<QString, qint32> mTopicSchemaId;
-
+    static QString randomId();
+    bool mVerbose;
 private slots:
     void onRequestClusterId();
     void onRequestSchema();
@@ -29,7 +28,7 @@ private slots:
     void onSend();
     void onWaitForData();
 public:
-    KafkaProtobufProducer(QString groupName, bool verbose);
+    KafkaProtobufProducer(bool verbose = false);
     static QByteArray addSchemaRegistryId(qint32 schemaId, const QByteArray& data);
     void send(OutputBinaryMessage message);
     void stop();
