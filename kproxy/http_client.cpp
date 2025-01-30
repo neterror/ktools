@@ -1,4 +1,5 @@
 #include "http_client.h"
+#include "kafka_messages.h"
 #include <qhttpheaders.h>
 
 HttpClient::HttpClient(QString server, QString user, QString password, bool verbose) :
@@ -40,6 +41,11 @@ QNetworkRequest HttpClient::requestV2(const QString& path, const QString& type) 
     }
     contentType += ".v2+json";
     request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
+
+    if (type == kMediaProtobuf) {
+        request.setRawHeader("Accept", contentType.toUtf8());
+    }
+
     return request;
 }
 
