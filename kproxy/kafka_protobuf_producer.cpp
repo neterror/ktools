@@ -52,7 +52,6 @@ void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schem
         auto topicLength = s.length() - kValueSuffix.length();
         auto topic = s.left(topicLength);
         mTopicSchemaId[topic] = schema.schemaId;
-        qDebug().noquote() << "topic" << topic << "schemaId = " << schema.schemaId;
     }
     emit schemaReady();
 }
@@ -70,14 +69,22 @@ void KafkaProtobufProducer::onSend() {
         return;
     }
 
-    auto data = mQueue.dequeue();
+    QList<QByteArray> toSend;
+    auto next = mQueue.dequeue();
     qint32 schemaId = -1;
-    auto it = mTopicSchemaId.find(data.topic);
+    auto it = mTopicSchemaId.find(next.topic);
     if (it != mTopicSchemaId.end()) {
         schemaId = *it;
     }
+    toSend << addSchemaRegistryId(schemaId, next.value);
 
-    mProxy->sendBinary(data.key, data.topic, {addSchemaRegistryId(schemaId, data.value)});
+    //all enqueued messages to the same topic have the same schemaId. Send them in batch
+    while ((mQueue.size() > 0) && (mQueue.front().topic == next.topic)) {
+        auto record = mQueue.dequeue();
+        toSend << addSchemaRegistryId(schemaId, record.value);
+    }
+
+    mProxy->sendBinary(next.key, next.topic, toSend);
 }
 
 QByteArray KafkaProtobufProducer::addSchemaRegistryId(qint32 schemaId, const QByteArray& input) {
@@ -117,7 +124,7 @@ void KafkaProtobufProducer::createObjects() {
     mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mVerbose, kMediaBinary));
     //mProxy.reset(new KafkaProxyV3(proxyServer, proxyUser, proxyPass));
 
-    mRegistry.reset(new SchemaRegistry(schemaServer, schemaUser, schemaPass));
+    mRegistry.reset(new SchemaRegistry(schemaServer, schemaUser, schemaPass, mVerbose));
 
     connect(mProxy.get(), &KafkaProxyV3::messageSent, this, &KafkaProtobufProducer::messageSent);
     connect(mProxy.get(), &KafkaProxyV3::failed, this, &KafkaProtobufProducer::failed);
