@@ -62,7 +62,7 @@ void KafkaProxyV2::deleteInstanceId() {
         emit finished(message);
     });
 
-    QTimer::singleShot(3000, [this]{
+    QTimer::singleShot(5000, [this]{
         debugLog("delete instance killed after timeout");
         emit finished("delete timeout");
     });
