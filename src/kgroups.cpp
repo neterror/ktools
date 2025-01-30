@@ -160,13 +160,14 @@ int main(int argc, char** argv) {
     std::unique_ptr<KafkaProxyV2> v2;
     std::unique_ptr<KafkaProxyV3> v3;
 
+    bool verbose = parser.isSet("verbose");
     if (parser.isSet("set-offset")) {
         if (!parser.isSet("group") || !parser.isSet("topic")) {
             qDebug() << "For set-offset specify topic and group";
             return -1;
         }
 
-        v2.reset(new KafkaProxyV2(server, user, password, parser.isSet("verbose")));
+        v2.reset(new KafkaProxyV2(server, user, password, verbose));
         QObject::connect(v2.get(), &HttpClient::initialized, [&v2, &parser, &app](QString instanceId){
             v2Commands(*v2, parser);
         });
@@ -176,7 +177,7 @@ int main(int argc, char** argv) {
         });
         v2->initialize(parser.value("group"));
     } else {
-        v3.reset(new KafkaProxyV3(server, user, password));
+        v3.reset(new KafkaProxyV3(server, user, password, verbose));
         QObject::connect(v3.get(), &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
             v3Commands(*v3, parser);
         });

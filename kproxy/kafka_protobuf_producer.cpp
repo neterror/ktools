@@ -7,7 +7,7 @@
 #include <qstringliteral.h>
 
 
-KafkaProtobufProducer::KafkaProtobufProducer() 
+KafkaProtobufProducer::KafkaProtobufProducer(QString groupName, bool verbose) : mGroupName{groupName}, mVerbose{verbose}
 {
     createObjects();
 
@@ -40,7 +40,7 @@ void KafkaProtobufProducer::onRequestSchema() {
 
 
 void KafkaProtobufProducer::onRequestClusterId() {
-    mProxy->initialize("");
+    mProxy->initialize(mGroupName);
 }
 
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {
@@ -114,7 +114,9 @@ void KafkaProtobufProducer::createObjects() {
     auto schemaUser = settings.value("ConfluentSchemaRegistry/user").toString();
     auto schemaPass = settings.value("ConfluentSchemaRegistry/password").toString();
 
-    mProxy.reset(new KafkaProxyV3(proxyServer, proxyUser, proxyPass));
+    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mVerbose, kMediaBinary));
+    //mProxy.reset(new KafkaProxyV3(proxyServer, proxyUser, proxyPass));
+
     mRegistry.reset(new SchemaRegistry(schemaServer, schemaUser, schemaPass));
 
     connect(mProxy.get(), &KafkaProxyV3::messageSent, this, &KafkaProtobufProducer::messageSent);

@@ -100,9 +100,7 @@ void deleteMany(KafkaProxyV3& v3, const QString& pattern) {
 }
 
 
-void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, QCoreApplication& app) {
-    parser.process(app);
-    
+void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser) {    
     if (parser.isSet("list")) {
         listTopics(v3, "");
         return;
@@ -160,10 +158,12 @@ int main(int argc, char** argv) {
             {"delete", "delete topic", "topic-name"},
             {"delete-many", "delete multiple topics matching the pattern", "pattern"},
             {"set-compact", "set cleanup.policy = true"},
+            {"verbose", "verbose logging"},
 
             {"set-replication-factor", "set topic-replication factor. defaults to 1", "replication-factor", "1"},
             {"set-partitions-count", "specify partitions count. defaults to 1", "partitions", "1"},
     });
+    parser.process(app);
 
     QSettings settings;
     auto server = settings.value("ConfluentRestProxy/server").toString();
@@ -172,9 +172,9 @@ int main(int argc, char** argv) {
     qDebug().noquote() << "Connecting to server" << server;
 
 
-    KafkaProxyV3 v3(server, user, password);
+    KafkaProxyV3 v3(server, user, password, parser.isSet("verbose"));
     QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
-        executeCommands(v3, parser, app);
+        executeCommands(v3, parser);
     });
 
     QObject::connect(&v3, &KafkaProxyV3::failed, [](QString message){

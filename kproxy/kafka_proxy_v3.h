@@ -55,7 +55,7 @@ public:
     };
     
 
-    KafkaProxyV3(QString server, QString user, QString password);
+    KafkaProxyV3(QString server, QString user, QString password, bool verbose);
     void initialize(QString name) override;
 
     void listTopics();

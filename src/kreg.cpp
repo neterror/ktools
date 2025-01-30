@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
             {"schema", "register protobuf file", "file.proto"},
             {"subject", "The subject(name) in the registry of the file", "name"},
             {"reference", "Comma separated list of reference schemaIds", "schemaId list"},
-
+            {"verbose", "verbose logging"},
             {"delete", "delete schema Id", "schemaId"},
             {"list", "list registered schemas"},
     });
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
     auto password = settings.value("ConfluentSchemaRegistry/password").toString();
     qDebug().noquote() << "Connecting to server" << server;
 
-    SchemaRegistry registry(server, user, password);
+    SchemaRegistry registry(server, user, password, parser.isSet("verbose"));
     std::unique_ptr<SchemaDelete> schemaDelete;
     std::unique_ptr<SchemaCreate> schemaCreate;
 

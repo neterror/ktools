@@ -1,7 +1,7 @@
 #include "kafka_proxy_v3.h"
 #include <qjsondocument.h>
 
-KafkaProxyV3::KafkaProxyV3(QString server, QString user, QString password) : HttpClient(server, user, password) {
+KafkaProxyV3::KafkaProxyV3(QString server, QString user, QString password, bool verbose) : HttpClient(server, user, password, verbose) {
     
 }
 

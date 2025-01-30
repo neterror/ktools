@@ -1,12 +1,14 @@
 #include "http_client.h"
 #include <qhttpheaders.h>
 
-HttpClient::HttpClient(QString server, QString user, QString password) :
-    mRest(&mNetworkManager), mServer{server}, mUser{user}, mPassword{password}
+HttpClient::HttpClient(QString server, QString user, QString password, bool verbose) :
+    mRest(&mNetworkManager), mServer{server}, mUser{user}, mPassword{password}, mVerbose{verbose}
 {
     mNetworkManager.setAutoDeleteReplies(true);
     mNetworkManager.setProxy(QNetworkProxy::NoProxy);
     connect(&mNetworkManager, &QNetworkAccessManager::authenticationRequired, this, &HttpClient::onAuthenticationRequired);
+
+    mTimer.start();
 }
 
 
@@ -38,7 +40,6 @@ QNetworkRequest HttpClient::requestV2(const QString& path, const QString& type) 
     }
     contentType += ".v2+json";
     request.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
-    request.setRawHeader("Accept", contentType.toUtf8());
     return request;
 }
 

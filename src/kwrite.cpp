@@ -50,15 +50,26 @@ void sendBinary(KafkaProxyV3& v3,
     });
 }
 
+QString randomId() {
+    auto now = QDateTime::currentDateTimeUtc();
+    auto epoch = now.toSecsSinceEpoch();
+    QByteArray random;
+    QFile f("/dev/random");
+    if (f.open(QIODevice::ReadOnly)) {
+        random = f.read(4);
+    }
 
-bool sendProtobuf(const QString& key, const QString& topic, const QString& protofile) {
+    return QString("kwrite-%1-%2").arg(random.toHex()).arg(epoch);
+}
+
+bool sendProtobuf(const QString& key, const QString& topic, const QString& protofile, bool verbose) {
     QFile f(protofile);
     if (!f.open(QIODevice::ReadOnly)) {
         qWarning() << "Failed to open" << protofile;
         return false;
     }
     auto value = f.readAll();
-    auto producer = std::make_shared<KafkaProtobufProducer>();
+    auto producer = std::make_shared<KafkaProtobufProducer>(randomId(), verbose);
     QObject::connect(producer.get(), &KafkaProtobufProducer::failed, [](const QString& message){
         qWarning().noquote() << message;
         QCoreApplication::quit();
@@ -106,13 +117,14 @@ int main(int argc, char** argv) {
             {"json", "send json data", "json-file"},
             {"binary", "send binary data, manual specification of the schemaId", "binary"},
             {"schemaId", "append schemaId to the binary data", "schemaId", "-1"},
+            {"verbose", "log additional information"},
             
             {"protobuf", "send binary data with automatic discovery of the schemaId from the topic name", "protobuf"}
     });
 
     parser.process(app);
     if (parser.isSet("protobuf") && parser.isSet("topic")) {
-        bool sent = sendProtobuf(parser.value("key"), parser.value("topic"), parser.value("protobuf"));
+        bool sent = sendProtobuf(parser.value("key"), parser.value("topic"), parser.value("protobuf"), parser.isSet("verbose"));
         if (sent) {
             return app.exec();
         } else {
@@ -125,7 +137,7 @@ int main(int argc, char** argv) {
     auto user = settings.value("ConfluentRestProxy/user").toString();
     auto password = settings.value("ConfluentRestProxy/password").toString();
 
-    KafkaProxyV3 v3(server, user, password);
+    KafkaProxyV3 v3(server, user, password, parser.isSet("verbose"));
     StdinReader reader;
     QObject::connect(&v3, &KafkaProxyV3::initialized, [&v3, &parser, &app, &reader](QString clusterId){
         executeCommands(v3, parser, reader);

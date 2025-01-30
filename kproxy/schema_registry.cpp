@@ -6,7 +6,7 @@
 #include <qnetworkreply.h>
 
 
-SchemaRegistry::SchemaRegistry(QString server, QString user, QString password) : HttpClient(server, user, password) {
+SchemaRegistry::SchemaRegistry(QString server, QString user, QString password, bool verbose) : HttpClient(server, user, password, verbose) {
 
 }
 

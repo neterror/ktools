@@ -23,7 +23,7 @@ public:
         QList<Reference> references;
     };
 
-    SchemaRegistry(QString server, QString user, QString password);
+    SchemaRegistry(QString server, QString user, QString password, bool verbose);
 
     void getSchemas();
     bool createSchema(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);

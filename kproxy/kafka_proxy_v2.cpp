@@ -6,11 +6,9 @@
 #include <qstringview.h>
 
 KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, bool verbose, QString mediaType) :
-    HttpClient(server, user, password),
-    mVerbose{verbose},
+    HttpClient(server, user, password, verbose),
     mMediaType(mediaType)
 {
-    mTimer.start();
 }
 
 
@@ -255,7 +253,6 @@ void KafkaProxyV2::sendJson(const QString& key, const QString& topic, const QJso
 }
 
 void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& data) {
-    auto url = QString("topics/%1").arg(topic);
     QJsonArray records;
     for (const auto& item: data) {
         QJsonObject record;
@@ -264,7 +261,6 @@ void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QL
             record["key"] = QString(base64Key);
         }
         record["value"] = QString(item.toBase64());
-
         records << record;
     }
 
@@ -272,18 +268,14 @@ void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QL
         {"records", records} 
     };
 
+    debugLog(QString("send %1 messages").arg(records.size()));
+    auto url = QString("topics/%1").arg(topic);
     mRest.post(requestV2(url, kMediaBinary), QJsonDocument{payload}, this,
                [this](QRestReply &reply) {
-                   qDebug() << reply.readText();
+                   debugLog(reply.readText());
                    emit messageSent();
                });
 }    
 
 
 
-void KafkaProxyV2::debugLog(const QString& log) {
-    if (mVerbose) {
-        int elapsed = mTimer.elapsed();
-        qDebug().noquote() << QString("[%1] %2").arg(elapsed, 7, 10, QChar('0')).arg(log);
-    }
-}
