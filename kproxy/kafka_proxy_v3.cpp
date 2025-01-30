@@ -24,7 +24,7 @@ QJsonArray KafkaProxyV3::getDataArray(QRestReply& reply, QString& errorMsg) {
 }
 
 
-void KafkaProxyV3::getClusterId() {
+void KafkaProxyV3::initialize(QString) {
     mRest.get(requestV3("v3/clusters"), this, [this](QRestReply& reply){
         QString errorMsg;
         auto data = getDataArray(reply, errorMsg);
@@ -175,7 +175,12 @@ void KafkaProxyV3::sendJson(const QString& key, const QString& topic, const QJso
     });
 }
 
-void KafkaProxyV3::sendProtobuf(const QString& key, const QString& topic, qint32 schemaId, const QByteArray& binary) {
+void KafkaProxyV3::sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& list) {
+    if (list.size() != 1) {
+        qWarning() << "KafkaProxyV3 can send only 1 record";
+        return;
+    }
+    auto binary = list.first();
     auto url = QString("v3/clusters/%1/topics/%2/records").arg(mClusterID).arg(topic);
     QJsonObject payload;
     if (!key.isEmpty()) {
@@ -185,20 +190,9 @@ void KafkaProxyV3::sendProtobuf(const QString& key, const QString& topic, qint32
         };
     }
 
-    QByteArray data;
-    if (schemaId != -1) {
-        auto header = std::array<quint8,6> {0x00, //magic
-                                            (quint8)(schemaId >> 24),
-                                            (quint8)(schemaId >> 16),
-                                            (quint8)(schemaId >> 8),
-                                            (quint8)(schemaId >> 0),
-                                            0x00}; //the first message in the proto file
-        std::copy(header.begin(), header.end(), std::back_inserter(data));
-    }
-    std::copy(binary.begin(), binary.end(), std::back_inserter(data));
     payload["value"] = QJsonObject {
         {"type", "BINARY"},
-        {"data", (QString)data.toBase64()}
+        {"data", (QString)binary.toBase64()}
     };
 
     mRest.post(requestV3(url), QJsonDocument(payload), this, [this](QRestReply &reply) {

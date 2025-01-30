@@ -42,7 +42,8 @@ void sendBinary(KafkaProxyV3& v3,
         QCoreApplication::quit();
         return;
     }
-    v3.sendProtobuf(key, topic, schemaId.toInt(), f.readAll());
+    auto data = KafkaProtobufProducer::addSchemaRegistryId(schemaId.toInt(), f.readAll());
+    v3.sendBinary(key, topic, {data});
     QObject::connect(&v3, &KafkaProxyV3::messageSent, [] {
         qDebug().noquote() << "Success. Data sent";
         QCoreApplication::quit();
@@ -103,10 +104,10 @@ int main(int argc, char** argv) {
             {"topic", "topic on which to send data", "send-topic"},
             {"key",   "kafka topic key", "topic-key"},
             {"json", "send json data", "json-file"},
-            {"binary", "send binary data", "binary"},
+            {"binary", "send binary data, manual specification of the schemaId", "binary"},
             {"schemaId", "append schemaId to the binary data", "schemaId", "-1"},
             
-            {"protobuf", "send protobuf binary file", "protobuf"}
+            {"protobuf", "send binary data with automatic discovery of the schemaId from the topic name", "protobuf"}
     });
 
     parser.process(app);
@@ -135,6 +136,6 @@ int main(int argc, char** argv) {
         QCoreApplication::quit();
     });
 
-    v3.getClusterId();
+    v3.initialize("");
     return app.exec();
 }

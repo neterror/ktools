@@ -4,6 +4,7 @@
 #include <qstringview.h>
 #include "kafka_messages.h"
 #include <QElapsedTimer>
+#include "kafka_proxy.h"
 
 class KafkaProxyV2 : public HttpClient {
     Q_OBJECT
@@ -24,16 +25,17 @@ public:
     void deleteInstanceId();
 
     KafkaProxyV2(QString server, QString user, QString password, bool verbose, QString mediaType = "");
-    void requestInstanceId(QString groupName);
+    void initialize(QString groupName) override;
     void subscribe(const QStringList& topic);
     void getRecords();
     void stopReading();
 
     void commitOffset(QString topic, qint32 offset);
     void getOffset(const QString& group, const QString& topic);
-    
+
+    void sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& data) override;
+    void sendJson(const QString& key, const QString& topic, const QJsonDocument& json) override;
 signals:
-    void obtainedInstanceId(QString intanceId);
     void subscribed(QString topics);
     void finished(QString message);
     void receivedJson(InputMessage<QJsonDocument> message);
@@ -41,6 +43,5 @@ signals:
     void receivedOffset(QString topic, qint32 offset);
     void readingComplete();
 
-    void failed(QString message);
     void offsetCommitted();
 };

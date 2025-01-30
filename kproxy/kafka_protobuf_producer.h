@@ -4,13 +4,13 @@
 #include <QQueue>
 #include <QObject>
 #include <QtStateMachine/qstatemachine.h>
-#include "kafka_proxy_v3.h"
+#include "http_client.h"
 #include "kafka_messages.h"
 #include "schema_registry.h"
 
 class KafkaProtobufProducer : public QObject {
     Q_OBJECT
-    std::unique_ptr<KafkaProxyV3> mProxy;
+    std::unique_ptr<HttpClient> mProxy;
     std::unique_ptr<SchemaRegistry> mRegistry;
 
     QStateMachine mSM;
@@ -18,6 +18,7 @@ class KafkaProtobufProducer : public QObject {
                         
     void createObjects();
     QMap<QString, qint32> mTopicSchemaId;
+
 private slots:
     void onRequestClusterId();
     void onRequestSchema();
@@ -27,6 +28,7 @@ private slots:
     void onWaitForData();
 public:
     KafkaProtobufProducer();
+    static QByteArray addSchemaRegistryId(qint32 schemaId, const QByteArray& data);
     void send(OutputBinaryMessage message);
     void stop();
 signals:

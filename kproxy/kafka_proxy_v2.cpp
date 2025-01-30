@@ -14,7 +14,7 @@ KafkaProxyV2::KafkaProxyV2(QString server, QString user, QString password, bool 
 }
 
 
-void KafkaProxyV2::requestInstanceId(QString groupName) {
+void KafkaProxyV2::initialize(QString groupName) {
     mGroupName = std::move(groupName);
     debugLog(QString("requestInstanceId with group %1, mediaType %2").arg(mGroupName).arg(mMediaType));
     auto url = QString("consumers/%1").arg(mGroupName);
@@ -38,7 +38,7 @@ void KafkaProxyV2::requestInstanceId(QString groupName) {
         if (obj.contains("instance_id")) {
             mInstanceId = obj["instance_id"].toString();
             debugLog(QString("obtained instanceId %1").arg(mInstanceId));
-            emit obtainedInstanceId(mInstanceId);
+            emit initialized(mInstanceId);
         } else {
             auto msg = obj["message"].toString();
             debugLog(QString("Failed to obtain instanceId %1").arg(msg));
@@ -248,6 +248,37 @@ void KafkaProxyV2::getOffset(const QString& group, const QString& topic) {
         qDebug().noquote() << reply.readText();
     });
 }
+
+
+void KafkaProxyV2::sendJson(const QString& key, const QString& topic, const QJsonDocument& json) {
+    qCritical() << "send json not implemented in KafkaProxyV2";
+}
+
+void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& data) {
+    auto url = QString("topics/%1").arg(topic);
+    QJsonArray records;
+    for (const auto& item: data) {
+        QJsonObject record;
+        if (!key.isEmpty()) { //there is no option to send the value in binary (base64) and leave the key as string
+            auto base64Key = key.toUtf8().toBase64(); 
+            record["key"] = QString(base64Key);
+        }
+        record["value"] = QString(item.toBase64());
+
+        records << record;
+    }
+
+    auto payload = QJsonObject {
+        {"records", records} 
+    };
+
+    mRest.post(requestV2(url, kMediaBinary), QJsonDocument{payload}, this,
+               [this](QRestReply &reply) {
+                   qDebug() << reply.readText();
+                   emit messageSent();
+               });
+}    
+
 
 
 void KafkaProxyV2::debugLog(const QString& log) {

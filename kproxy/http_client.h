@@ -20,4 +20,13 @@ private slots:
     void onAuthenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);
 public:
     HttpClient(QString server, QString user, QString password);
+
+    virtual void initialize(QString name) {}
+    virtual void sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& data) {}
+    virtual void sendJson(const QString& key, const QString& topic, const QJsonDocument& json) {}
+
+signals:
+    void initialized(QString data);
+    void messageSent();
+    void failed(QString message);
 };

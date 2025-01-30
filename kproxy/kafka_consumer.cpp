@@ -18,14 +18,14 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     auto subscribe = new QState(work);   //subscribe to the topic
     auto read = new QState(work);        //read message
 
-    connect(init,      &QState::entered, [this, group] {mProxy->requestInstanceId(group);});
+    connect(init,      &QState::entered, [this, group] {mProxy->initialize(group);});
     connect(subscribe, &QState::entered, [this, topics] {mProxy->subscribe(topics);});
     connect(read,      &QState::entered, [this] {mProxy->getRecords();});
 
     connect(success,   &QState::entered, this, &KafkaConsumer::onSuccess);
     connect(error,     &QState::entered, this, &KafkaConsumer::onFailed);
 
-    init->addTransition(mProxy.get(), &KafkaProxyV2::obtainedInstanceId, subscribe);
+    init->addTransition(mProxy.get(), &KafkaProxyV2::initialized, subscribe);
     subscribe->addTransition(mProxy.get(), &KafkaProxyV2::subscribed, read);
 
     read->addTransition(mProxy.get(), &KafkaProxyV2::readingComplete, read);

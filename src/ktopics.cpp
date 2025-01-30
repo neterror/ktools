@@ -182,6 +182,6 @@ int main(int argc, char** argv) {
         QCoreApplication::quit();
     });
 
-    v3.getClusterId();
+    v3.initialize("");
     return app.exec();
 }

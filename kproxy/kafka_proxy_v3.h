@@ -7,7 +7,6 @@ class KafkaProxyV3 : public HttpClient {
     QString mClusterID;
 
     static QJsonArray getDataArray(QRestReply& reply, QString& msg);
-
 public:
     struct Topic {
         QString name;
@@ -57,7 +56,7 @@ public:
     
 
     KafkaProxyV3(QString server, QString user, QString password);
-    void getClusterId();
+    void initialize(QString name) override;
 
     void listTopics();
     void listGroups();
@@ -66,14 +65,13 @@ public:
     void createTopic(const QString& topic, bool isCompact, qint32 replicationFactor, qint32 partitionsCount);
     void deleteTopic(const QString& topic);
 
-    void sendJson(const QString& key, const QString& topic, const QJsonDocument& json);
-    void sendProtobuf(const QString& key, const QString& topic, qint32 schemaId, const QByteArray& data);
+    void sendJson(const QString& key, const QString& topic, const QJsonDocument& json) override;
+    void sendBinary(const QString& key, const QString& topic, const QList<QByteArray>& binary) override;
     void getGroupConsumers(const QString& group);
     void getGroupLag(const QString& group);
     void getGroupLagSummary(const QString& group);
 
 signals:
-    void initialized(QString clusterId);
     void topicList(QList<Topic> data);
     void groupList(QList<Group> data);
     void consumerList(QList<Consumer> data);
@@ -83,6 +81,4 @@ signals:
     void topicConfig(QList<TopicConfig> configs);
     void topicCreated();
     void topicDeleted();
-    void messageSent();
-    void failed(QString message);
 };

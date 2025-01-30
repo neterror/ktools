@@ -2,6 +2,7 @@
 #include <qcommandlineparser.h>
 #include <qcoreapplication.h>
 #include <qjsondocument.h>
+#include "http_client.h"
 #include "kafka_proxy_v3.h"
 #include "kafka_proxy_v2.h"
 
@@ -166,14 +167,14 @@ int main(int argc, char** argv) {
         }
 
         v2.reset(new KafkaProxyV2(server, user, password, parser.isSet("verbose")));
-        QObject::connect(v2.get(), &KafkaProxyV2::obtainedInstanceId, [&v2, &parser, &app](QString instanceId){
+        QObject::connect(v2.get(), &HttpClient::initialized, [&v2, &parser, &app](QString instanceId){
             v2Commands(*v2, parser);
         });
         QObject::connect(v2.get(), &KafkaProxyV2::failed, [](QString message){
             qDebug().noquote() << message;
             QCoreApplication::quit();
         });
-        v2->requestInstanceId(parser.value("group"));
+        v2->initialize(parser.value("group"));
     } else {
         v3.reset(new KafkaProxyV3(server, user, password));
         QObject::connect(v3.get(), &KafkaProxyV3::initialized, [&v3, &parser, &app](QString clusterId){
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
             qDebug().noquote() << message;
             QCoreApplication::quit();
         });
-        v3->getClusterId();
+        v3->initialize("");
     }
 
     return app.exec();

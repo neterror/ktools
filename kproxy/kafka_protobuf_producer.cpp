@@ -1,6 +1,8 @@
 #include "kafka_protobuf_producer.h"
+#include "http_client.h"
 #include "kafka_messages.h"
 #include "kafka_proxy_v3.h"
+#include "kafka_proxy_v2.h"
 #include "schema_registry.h"
 #include <qstringliteral.h>
 
@@ -15,11 +17,11 @@ KafkaProtobufProducer::KafkaProtobufProducer()
     auto send = new QState(&mSM);
 
     readSchema->addTransition(this, &KafkaProtobufProducer::schemaReady, getClusterId);
-    getClusterId->addTransition(mProxy.get(), &KafkaProxyV3::initialized, waitForData);
+    getClusterId->addTransition(mProxy.get(), &HttpClient::initialized, waitForData);
 
     waitForData->addTransition(this, &KafkaProtobufProducer::newData, send);
-    send->addTransition(mProxy.get(), &KafkaProxyV3::messageSent, waitForData);
-    send->addTransition(mProxy.get(), &KafkaProxyV3::failed, waitForData);
+    send->addTransition(mProxy.get(), &HttpClient::messageSent, waitForData);
+    send->addTransition(mProxy.get(), &HttpClient::failed, waitForData);
 
     connect(readSchema,  &QState::entered, this, &KafkaProtobufProducer::onRequestSchema);
     connect(getClusterId, &QState::entered, this, &KafkaProtobufProducer::onRequestClusterId);
@@ -38,7 +40,7 @@ void KafkaProtobufProducer::onRequestSchema() {
 
 
 void KafkaProtobufProducer::onRequestClusterId() {
-    mProxy->getClusterId();
+    mProxy->initialize("");
 }
 
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {
@@ -65,15 +67,32 @@ void KafkaProtobufProducer::onSend() {
     if (mQueue.isEmpty()) {
         qWarning() << "Empty queue for proxy send!";
         emit error();
-    } else {
-        auto data = mQueue.dequeue();
-        qint32 schemaId = -1;
-        auto it = mTopicSchemaId.find(data.topic);
-        if (it != mTopicSchemaId.end()) {
-            schemaId = *it;
-        }
-        mProxy->sendProtobuf(data.key, data.topic, schemaId, data.value);
+        return;
     }
+
+    auto data = mQueue.dequeue();
+    qint32 schemaId = -1;
+    auto it = mTopicSchemaId.find(data.topic);
+    if (it != mTopicSchemaId.end()) {
+        schemaId = *it;
+    }
+
+    mProxy->sendBinary(data.key, data.topic, {addSchemaRegistryId(schemaId, data.value)});
+}
+
+QByteArray KafkaProtobufProducer::addSchemaRegistryId(qint32 schemaId, const QByteArray& input) {
+    if (schemaId == -1) return input;
+
+    QByteArray data;
+    auto header = std::array<quint8,6> {0x00, //magic
+                                        (quint8)(schemaId >> 24),
+                                        (quint8)(schemaId >> 16),
+                                        (quint8)(schemaId >> 8),
+                                        (quint8)(schemaId >> 0),
+                                        0x00}; //the first message in the proto file
+    std::copy(header.begin(), header.end(), std::back_inserter(data));
+    std::copy(input.begin(), input.end(), std::back_inserter(data));
+    return data;
 }
 
 void KafkaProtobufProducer::send(OutputBinaryMessage data) {
