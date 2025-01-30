@@ -28,7 +28,7 @@ private slots:
     void onSend();
     void onWaitForData();
 public:
-    KafkaProtobufProducer(bool verbose = false);
+    KafkaProtobufProducer(bool verbose);
     static QByteArray addSchemaRegistryId(qint32 schemaId, const QByteArray& data);
     void send(OutputBinaryMessage message);
     void stop();
