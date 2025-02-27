@@ -71,9 +71,9 @@ void registerProtobuf(SchemaCreate& creator, const QString& fileName, const QStr
 
 void listSchemas(SchemaRegistry& registry) {
     QObject::connect(&registry, &SchemaRegistry::schemaList, [](const QList<SchemaRegistry::Schema>& schemas){
-        QList<int> columns = {10, 40, 10, 20};
+        QList<int> columns = {10, 50, 10, 20};
         printTableRow({"SchemaId", "Subject", "Version", "Reference"}, columns);
-        qDebug().noquote() << "-------------------------------------------------------";
+        qDebug().noquote() << "-------------------------------------------------------------------";
         for (const auto& schema: schemas) {
             auto row = toStringList(schema);
             printTableRow(row, columns);

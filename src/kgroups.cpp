@@ -17,11 +17,11 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 
 void listGroups(KafkaProxyV3& v3) {
     QObject::connect(&v3, &KafkaProxyV3::groupList, [](auto groups){
-        printTableRow({"GroupID", "State"}, {40, 10});
-        qDebug().noquote() << "-------------------------------------------------";
+        printTableRow({"GroupID", "State"}, {80, 10});
+        qDebug().noquote() << "--------------------------------------------------------------------------------------";
 
         for (const auto& group: groups) {
-            printTableRow({group.name, group.state}, {40, 10});
+            printTableRow({group.name, group.state}, {80, 10});
         }
         QCoreApplication::quit();
     });
@@ -145,6 +145,7 @@ int main(int argc, char** argv) {
             {"lag", "Get group lag data"},
             {"lag-summary", "Get lat summary"},
             {"set-offset", "Set reading offset", "set-offset"},
+            {"verbose", "verbose logging"},
             {"topic", "change the offset of topic", "topic"}
             
     });
