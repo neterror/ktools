@@ -182,6 +182,9 @@ void KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     input.topic = obj["topic"].toString();
     auto value = QByteArray::fromBase64(obj["value"].toString().toUtf8());
 
+    auto key = obj["key"].toString().toUtf8();
+    input.key = QByteArray::fromBase64(key);
+
     qint32 schemaId;
     if (isValid(value, schemaId)) {
         input.value = value.mid(6);
