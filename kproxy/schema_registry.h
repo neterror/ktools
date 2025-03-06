@@ -28,11 +28,15 @@ public:
     void getSchemas();
     bool createSchema(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);
     void deleteSchema(const QString& subject, qint32 version);
+    void deleteSchema(const QString& subject, bool permanently);
+
+    void getLatestSchemaId(const QString& subject);
 signals:
     void schemaList(QList<Schema> schemas);
-    void schemaDeleted(bool success, QString subject, qint32 version);
+    void schemaDeleted(bool success);
     void schemaCreated(qint32 schemaId);
     void failed(QString message);
+    void subjectSchemaId(QString subject, qint32 schemaId);
 
 private:
     QJsonDocument createSchemaJson(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);

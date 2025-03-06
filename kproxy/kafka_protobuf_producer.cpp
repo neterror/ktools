@@ -57,13 +57,19 @@ void KafkaProtobufProducer::onRequestClusterId() {
 
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {
     const auto kValueSuffix = QStringLiteral("-value");
+    QMap<QString, qint32> schemaVersion;
+
     for (const auto& schema: schemas) {
         const auto& s = schema.subject;
         if (!s.endsWith(kValueSuffix)) continue;
 
         auto topicLength = s.length() - kValueSuffix.length();
         auto topic = s.left(topicLength);
-        mTopicSchemaId[topic] = schema.schemaId;
+        if (!schemaVersion.contains(topic) || schemaVersion[topic] < schema.version) {
+            //keep only the latest version
+            mTopicSchemaId[topic] = schema.schemaId;
+            schemaVersion[topic] = schema.version;
+        }
     }
     emit schemaReady();
 }

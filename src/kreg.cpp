@@ -1,6 +1,5 @@
 #include "schema_create.h"
 #include "schema_registry.h"
-#include "schema_delete.h"
 #include <QtCore>
 #include <qcommandlineoption.h>
 #include <qcoreapplication.h>
@@ -31,6 +30,7 @@ QStringList toStringList(const SchemaRegistry::Schema& schema) {
     
     return result;
 }
+
 
 void registerProtobuf(SchemaCreate& creator, const QString& fileName, const QString& subject, QString referenceIds) {
     if (subject.isEmpty()) {
@@ -84,26 +84,41 @@ void listSchemas(SchemaRegistry& registry) {
     registry.getSchemas();
 }
 
-void deleteSchemaId(SchemaDelete& schemaDelete, qint32 schemaId) {
-    QObject::connect(&schemaDelete, &SchemaDelete::error, [](QString message){
-        qWarning().noquote() << message;
-        QCoreApplication::quit();
-    });
-
-    QObject::connect(&schemaDelete, &SchemaDelete::deleted, [target=schemaId](bool success, qint32 schemaId, QString subject, qint32 version){
+void deleteSchemaBySubject(SchemaRegistry& registry, const QString& subject, bool permanent) {
+    registry.deleteSchema(subject, permanent);
+    QObject::connect(&registry, &SchemaRegistry::schemaDeleted, [subject](bool success){
         if (success) {
-            qDebug().noquote() << "deleted schemaId" << schemaId << "subject" << subject << "version" << version;
+            qDebug().noquote() << "successfully deleted schema" << subject;
         } else {
-            qWarning().noquote() << "failed to delete" << target;
+            qDebug().noquote() << "failed to delete schema" << subject;
         }
-        QCoreApplication::quit();
+
+        QTimer::singleShot(100, QCoreApplication::instance(), &QCoreApplication::quit);
     });
-    schemaDelete.deleteSchemaId(schemaId);
+}
+
+void getSchemaIdBySubject(SchemaRegistry& registry, const QString& subject) {
+    registry.getLatestSchemaId(subject);
+    QObject::connect(&registry, &SchemaRegistry::subjectSchemaId, [](QString subject, qint32 schemaId){
+        qDebug().noquote() << schemaId;
+        QTimer::singleShot(100, [schemaId]{QCoreApplication::exit(schemaId);});
+    });
+}
+ 
+
+
+static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
+    QByteArray localMsg = msg.toLocal8Bit();
+    printf("%s\n", localMsg.constData());
 }
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
+
+
+    qInstallMessageHandler(stdoutOutput);
+
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
@@ -115,7 +130,9 @@ int main(int argc, char** argv) {
             {"subject", "The subject(name) in the registry of the file", "name"},
             {"reference", "Comma separated list of reference schemaIds", "schemaId list"},
             {"verbose", "verbose logging"},
-            {"delete", "delete schema Id", "schemaId"},
+            {"delete", "delete schema subject", "subject"},
+            {"permanent", "permanent delete flag"},
+            {"schemaId", "retrieve the schema id of the specified subject", "subject"},
             {"list", "list registered schemas"},
     });
     parser.process(app);
@@ -124,10 +141,8 @@ int main(int argc, char** argv) {
     auto server = settings.value("ConfluentSchemaRegistry/server").toString();
     auto user = settings.value("ConfluentSchemaRegistry/user").toString();
     auto password = settings.value("ConfluentSchemaRegistry/password").toString();
-    qDebug().noquote() << "Connecting to server" << server;
 
     SchemaRegistry registry(server, user, password, parser.isSet("verbose"));
-    std::unique_ptr<SchemaDelete> schemaDelete;
     std::unique_ptr<SchemaCreate> schemaCreate;
 
 
@@ -149,11 +164,15 @@ int main(int argc, char** argv) {
     }
 
     if (!processed && parser.isSet("delete")) {
-        schemaDelete.reset(new SchemaDelete(registry));
-        deleteSchemaId(*schemaDelete, parser.value("delete").toInt());
+        deleteSchemaBySubject(registry, parser.value("delete"), parser.isSet("permanent"));
         processed = true;
     }
 
+    if (!processed && parser.isSet("schemaId")) {
+        getSchemaIdBySubject(registry, parser.value("schemaId"));
+        processed = true;
+    }
+    
 
     if (!processed) {
         parser.showHelp();

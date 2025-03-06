@@ -6,7 +6,6 @@ set(HEADERS
   kafka_proxy_v2.h
   kafka_proxy_v3.h
   schema_registry.h
-  schema_delete.h
   schema_create.h
   topics_delete.h
 )  
@@ -18,7 +17,6 @@ add_library(kproxy STATIC
   kafka_proxy_v2.cpp
   kafka_proxy_v3.cpp
   schema_registry.cpp
-  schema_delete.cpp
   schema_create.cpp
   topics_delete.cpp
 

@@ -57,6 +57,24 @@ void SchemaRegistry::getSchemas() {
     });
 }
 
+void SchemaRegistry::getLatestSchemaId(const QString& subject) {
+    QString url = "/subjects/" + subject + "/versions/-1";
+    auto request = requestV3(url); //-1 is for the latest version
+    mRest.get(request, this, [this,subject](QRestReply& reply){
+        if (reply.error() != QNetworkReply::NoError) {
+            emit subjectSchemaId(subject, -1);
+        } else {
+            auto schemaId = -1;
+            if (auto json = reply.readJson(); json) {
+                auto obj = json->object();
+                schemaId =  obj.contains("id") ? obj["id"].toInt() : -1;
+            }
+            emit subjectSchemaId(subject, schemaId);
+        }
+    });
+}
+
+
 
 bool SchemaRegistry::createSchema(const QString& subject,
                                     const QByteArray& schema,
@@ -95,21 +113,59 @@ bool SchemaRegistry::createSchema(const QString& subject,
 
 
 void SchemaRegistry::deleteSchema(const QString& subject, qint32 version) {
-    QString url = QString("subjects/%1/versions/%2").arg(subject).arg(version);
+    QString url = QString("subjects/%1/versions/%2?permanent=true").arg(subject).arg(version);
     auto reply = mRest.deleteResource(requestV3(url), this, [this,subject,version](QRestReply &reply) {
         auto json = reply.readJson();
         if (json && json->isObject()) {
             auto obj = json->object();
             if (obj.contains("error_code")) {
                 qWarning() << "schema deletion failed:" << obj["message"].toString();
-                emit schemaDeleted(false, subject, version);
+                emit schemaDeleted(false);
                 return;
             }
         }
 
-        emit schemaDeleted(true, subject, version);
+        emit schemaDeleted(true);
     });
 }
+
+
+void SchemaRegistry::deleteSchema(const QString& subject, bool permanently) {
+    QString url = QString("subjects/%1").arg(subject);
+    mRest.deleteResource(requestV3(url), this, [this,subject,permanently](QRestReply &reply) {
+        auto json = reply.readJson();
+        if (json && json->isObject()) {
+            auto obj = json->object();
+            if (obj.contains("error_code")) {
+                qWarning() << "schema deletion failed:" << obj["message"].toString();
+                emit schemaDeleted(false);
+            }
+        }
+
+        if (!permanently) {
+            emit schemaDeleted(true);
+            return;
+        }
+            
+        //repeat again the deletion, this time with permanent=true
+        QString url = QString("subjects/%1?permanent=true").arg(subject);
+        mRest.deleteResource(requestV3(url), this, [this,subject,permanently](QRestReply &reply) {
+            auto json = reply.readJson();
+            if (json && json->isObject()) {
+                auto obj = json->object();
+                if (obj.contains("error_code")) {
+                    qWarning() << "schema deletion failed:" << obj["message"].toString();
+                    emit schemaDeleted(false);
+                    return;
+                }
+            }
+        });
+
+        emit schemaDeleted(true);
+    });
+}
+
+
 
 
 
@@ -117,7 +173,6 @@ QJsonDocument SchemaRegistry::createSchemaJson(const QString& subject,
                                                const QByteArray& schema,
                                                const QString& schemaType,
                                                const QList<Schema>& references)
-
 {
     auto json = QJsonObject {
         {"schema", QString(schema)},
