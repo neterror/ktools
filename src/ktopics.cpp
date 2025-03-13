@@ -16,6 +16,11 @@ void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
 
 inline QString toStr(qint32 num) {return QString("%1").arg(num);}
 
+static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
+    QByteArray localMsg = msg.toLocal8Bit();
+    printf("%s\n", localMsg.constData());
+}
+
 void listTopics(KafkaProxyV3& v3, const QString& pattern) {
 
     QObject::connect(&v3, &KafkaProxyV3::topicList, [pattern](QList<KafkaProxyV3::Topic> topics){
@@ -145,6 +150,8 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser) {
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
+
+    qInstallMessageHandler(stdoutOutput);
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");

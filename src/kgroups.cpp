@@ -128,9 +128,17 @@ void v3Commands(KafkaProxyV3& v3, QCommandLineParser& parser) {
 }
 
 
+
+static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
+    QByteArray localMsg = msg.toLocal8Bit();
+    printf("%s\n", localMsg.constData());
+}
+
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
+
+    qInstallMessageHandler(stdoutOutput);
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");

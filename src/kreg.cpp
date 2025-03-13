@@ -119,7 +119,6 @@ int main(int argc, char** argv) {
 
     qInstallMessageHandler(stdoutOutput);
 
-
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
 

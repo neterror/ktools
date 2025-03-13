@@ -29,6 +29,11 @@ void sendJson(KafkaProxyV3& v3, const QString& key, const QString& topic, const 
     });
 }
 
+static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
+    QByteArray localMsg = msg.toLocal8Bit();
+    printf("%s\n", localMsg.constData());
+}
+
 
 void sendBinary(KafkaProxyV3& v3,
                 const QString& key,
@@ -95,6 +100,8 @@ void executeCommands(KafkaProxyV3& v3, QCommandLineParser& parser, StdinReader& 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
+
+    qInstallMessageHandler(stdoutOutput);
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");

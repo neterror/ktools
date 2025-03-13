@@ -189,6 +189,8 @@ void KafkaProxyV2::reportInputBinary(const QJsonObject& obj) {
     if (isValid(value, schemaId)) {
         input.value = value.mid(6);
         emit receivedBinary(schemaId, input);
+    } else {
+        qWarning() << "failed binary reception on topic" << input.topic << obj["value"].toString();
     }
 }
 

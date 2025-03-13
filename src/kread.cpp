@@ -20,6 +20,7 @@ static void cleanExit(int) {
 }
 
 
+
 static void receivedJson(const InputMessage<QJsonDocument>& message) {
     QJsonObject msg;
     msg["info"] = QJsonObject {
@@ -48,9 +49,17 @@ static void receivedBinary(qint32 schemaId, const InputMessage<QByteArray>& mess
 
 
 
+static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
+    QByteArray localMsg = msg.toLocal8Bit();
+    printf("%s\n", localMsg.constData());
+}
+
+
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
+
+    qInstallMessageHandler(stdoutOutput);
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
