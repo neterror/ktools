@@ -13,45 +13,17 @@ static KafkaConsumer* _consumer;
 
 static void cleanExit(int) {
     if (_consumer) {
+        qDebug().noquote() << "stopping the consumer";
         _consumer->stop();
     } else {
         QCoreApplication::quit();
     }
 }
 
-
-
-static void receivedJson(const InputMessage<QJsonDocument>& message) {
-    QJsonObject msg;
-    msg["info"] = QJsonObject {
-        {"topic", message.topic},
-        {"key", message.key},
-        {"offset", message.offset},
-        {"partition", message.partition},
-    };
-    msg["value"] = message.value.object();
-
-    auto output = QJsonDocument(msg).toJson(QJsonDocument::Compact);;
-    printf("%s\n\n", output.toStdString().c_str());
-}
-
 static void receivedBinary(qint32 schemaId, const InputMessage<QByteArray>& message) {
-    static int counter = 0;
-    qDebug() << "schemaId = " << schemaId;
-    auto name = QString("msg%1_schema_id%2_topic_%3.bin").arg(message.offset).arg(schemaId).arg(message.topic);
-    QFile f(name);
-    if (f.open(QIODevice::WriteOnly)) {
-        f.write(message.value);
-        f.close();
-        qDebug().noquote() << "binary message in" << name;
-    }
-}
-
-
-
-static void stdoutOutput(QtMsgType type, const QMessageLogContext&, const QString &msg) {
-    QByteArray localMsg = msg.toLocal8Bit();
-    printf("%s\n", localMsg.constData());
+    auto base64 = message.value.toBase64();
+    printf("%s\n", base64.constData());
+    fflush(stdout);
 }
 
 
@@ -59,24 +31,16 @@ int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
 
-    qInstallMessageHandler(stdoutOutput);
-
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
 
     parser.addHelpOption();
     parser.addOptions({
             {"group", "group name", "group"},
-            {"topics", "comma separated list of topics to listen", "list of topics"},
-            {"media-type",  "protobuf or binary format", "type", kMediaProtobuf},
+            {"topic", "listen to topic", "topic"},
             {"verbose", "show debug prints"}
     });
     parser.process(app);
-    auto mediaType = parser.value("media-type");
-    if ((mediaType != kMediaProtobuf) && (mediaType != kMediaBinary)) {
-        qCritical().noquote() << "the mediatype should be protobuf or binary";
-        return -1;
-    }
 
     QSettings settings;
     auto server = settings.value("ConfluentRestProxy/server").toString();
@@ -85,14 +49,14 @@ int main(int argc, char** argv) {
 
     qDebug().noquote() << "Connecting to server" << server;
 
-    auto topics = parser.value("topics").trimmed();
-    KafkaConsumer consumer(parser.value("group"), topics.split(","), parser.isSet("verbose"), parser.value("media-type"));
+    auto topic = parser.value("topic").trimmed();
+    KafkaConsumer consumer(parser.value("group"), {topic}, parser.isSet("verbose"), kMediaBinary);
 
     _consumer = &consumer;
     signal(SIGINT, cleanExit);
     signal(SIGTERM, cleanExit);
     
-    if (!parser.isSet("group") || !parser.isSet("topics")) {
+    if (!parser.isSet("group") || !parser.isSet("topic")) {
         parser.showHelp();
     }
 
@@ -101,7 +65,6 @@ int main(int argc, char** argv) {
         qWarning().noquote() << message;
     });
 
-    QObject::connect(&consumer, &KafkaConsumer::receivedJson, [](auto message) {receivedJson(message);});
     QObject::connect(&consumer, &KafkaConsumer::receivedBinary, [](auto schemaId, auto message) {receivedBinary(schemaId, message);});
     QObject::connect(&consumer, &KafkaConsumer::finished, [] {
         QCoreApplication::quit();
