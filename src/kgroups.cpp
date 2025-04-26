@@ -149,7 +149,8 @@ int main(int argc, char** argv) {
             {"group", "Group name", "group name"},
 
             {"consumers", "list the groups"},
-            //todo
+            {"delete-v2-instance", "delete v2 instance", "instanceId"},
+
             {"lag", "Get group lag data"},
             {"lag-summary", "Get lat summary"},
             {"set-offset", "Set reading offset", "set-offset"},
@@ -170,6 +171,19 @@ int main(int argc, char** argv) {
     std::unique_ptr<KafkaProxyV3> v3;
 
     bool verbose = parser.isSet("verbose");
+
+    if (parser.isSet("delete-v2-instance")) {
+        v2.reset(new KafkaProxyV2(server, user, password, verbose));
+        v2->deleteInstanceId(parser.value("delete-v2-instance"), parser.value("group"));
+        QObject::connect(v2.get(), &KafkaProxyV2::finished, [](QString message){
+            qDebug().noquote() << message;
+            QCoreApplication::quit();
+        });
+        return app.exec();
+    }
+
+
+
     if (parser.isSet("set-offset")) {
         if (!parser.isSet("group") || !parser.isSet("topic")) {
             qDebug() << "For set-offset specify topic and group";
