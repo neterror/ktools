@@ -174,8 +174,8 @@ int main(int argc, char** argv) {
 
     if (parser.isSet("delete-v2-instance")) {
         v2.reset(new KafkaProxyV2(server, user, password, verbose));
-        v2->deleteInstanceId(parser.value("delete-v2-instance"), parser.value("group"));
-        QObject::connect(v2.get(), &KafkaProxyV2::finished, [](QString message){
+        v2->deleteOldInstanceId(parser.value("delete-v2-instance"), parser.value("group"));
+        QObject::connect(v2.get(), &KafkaProxyV2::oldInstanceDeleted, [](QString message){
             qDebug().noquote() << message;
             QCoreApplication::quit();
         });

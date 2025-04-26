@@ -6,6 +6,7 @@
 KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bool verbose, const QString& mediaType)
 {
     createProxy(verbose, mediaType);
+    mGroupName = group;
 
     auto work = new QState(&mSM);
     auto success = new QFinalState(&mSM);
@@ -39,19 +40,51 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     connect(mProxy.get(), &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
 
 
+    connect(mProxy.get(), &KafkaProxyV2::initialized, [this,group](QString instanceId) {
+        auto fileName = instanceBackupFile(group);
+        qDebug() << "try to create file to store instance" << instanceId << "of group" << group;
+        QFile f(instanceBackupFile(group));
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(instanceId.toUtf8());
+            qDebug().noquote() << "created backup file" << f.fileName() << "to store assigned instanceId" << instanceId;
+        } else {
+            qWarning().noquote() << "No instanceId backup was made";
+        }
+    });
+
+
     connect(mProxy.get(), &KafkaProxyV2::failed, [this](QString error){
         qWarning().noquote() << "KafkaProxyV2 error:" << error;
         emit failed(error);
     });
 
 
+    //if there was an old intance, start the consumer only after deleting the old instance
+    connect(mProxy.get(), &KafkaProxyV2::oldInstanceDeleted,[this](QString message) {
+        qDebug() << "old instance deleted. Now start the client state machine";
+        mSM.start();
+    });
+    
+
     mSM.setInitialState(work);
     work->setInitialState(init);
 }
 
+QString KafkaConsumer::instanceBackupFile(const QString& group) {
+    return QString("/tmp/kproxy-group-%1").arg(group);
+}
+
 
 void KafkaConsumer::start() {
-    mSM.start();
+    QFile f(instanceBackupFile(mGroupName));
+    if (!f.open(QIODevice::ReadOnly)) {
+        mSM.start();
+        return;
+    }
+
+    auto instanceId = f.readAll();
+    qDebug() << "before starting, delete the old instanceId" << instanceId;
+    mProxy->deleteOldInstanceId(instanceId, mGroupName); //the signal deleteOldInstance will invoke start of the state machine
 }
 
 void KafkaConsumer::stop() {
@@ -62,10 +95,22 @@ void KafkaConsumer::stop() {
 
 void KafkaConsumer::onSuccess() {
     mProxy->deleteInstanceId();
+    QDir path;
+    auto fileName = instanceBackupFile(mGroupName);
+    if (QFile::exists(fileName)) {
+        qDebug()<< "deleting " << fileName;
+        path.remove(fileName);
+    }
 }
 
 void KafkaConsumer::onFailed() {
     mProxy->deleteInstanceId();
+    QDir path;
+    auto fileName = instanceBackupFile(mGroupName);
+    if (QFile::exists(fileName)) {
+        qDebug()<< "deleting " << fileName;
+        path.remove(fileName);
+    }
 }
 
 

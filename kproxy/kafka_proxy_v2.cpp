@@ -68,6 +68,16 @@ void KafkaProxyV2::deleteInstanceId() {
     });
 }
 
+void KafkaProxyV2::deleteOldInstanceId(const QString& instanceId, const QString& group) {
+    auto url = QString("consumers/%1/instances/%2").arg(group).arg(instanceId);
+    debugLog(QString("delete instanceId %1").arg(instanceId));
+    mRest.deleteResource(requestV2(url), this, [this](QRestReply &reply) {
+        emit oldInstanceDeleted(reply.readText());
+    });
+}
+
+
+
 void KafkaProxyV2::subscribe(const QStringList& topics) {
     auto url = QString("consumers/%1/instances/%2/subscription").arg(mGroupName).arg(mInstanceId);
     debugLog(QString("subscribe to %1").arg(topics.join(",")));

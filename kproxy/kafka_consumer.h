@@ -10,9 +10,12 @@ class KafkaConsumer : public QObject {
     Q_OBJECT
     std::unique_ptr<KafkaProxyV2> mProxy;
     QStateMachine mSM;
+    QString mGroupName;
 
     QString generateRandomId();
     void createProxy(bool verbose, const QString& mediaType);
+    QString instanceBackupFile(const QString& group);
+
 private slots:
     void onSuccess();
     void onFailed();

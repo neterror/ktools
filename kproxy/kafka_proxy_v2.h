@@ -20,6 +20,7 @@ public:
 
     QString instanceId() const {return mInstanceId;}
     void deleteInstanceId();
+    void deleteOldInstanceId(const QString& instance, const QString& group);
 
     KafkaProxyV2(QString server, QString user, QString password, bool verbose, QString mediaType = "");
     void initialize(QString groupName) override;
@@ -39,6 +40,7 @@ signals:
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
     void readingComplete();
+    void oldInstanceDeleted(QString message);
 
     void offsetCommitted();
 };
