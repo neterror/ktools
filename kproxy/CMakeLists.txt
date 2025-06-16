@@ -33,5 +33,5 @@ set_target_properties(kproxy PROPERTIES POSITION_INDEPENDENT_CODE ON)
 install(TARGETS kproxy
   EXPORT kproxyTargets
   LIBRARY DESTINATION lib
-  PUBLIC_HEADER DESTINATION include/kproxy)
+  PUBLIC_HEADER DESTINATION usr/include/kproxy)
 
