@@ -26,6 +26,7 @@ public:
     SchemaRegistry(QString server, QString user, QString password, bool verbose);
 
     void getSchemas();
+    void readSchema(quint32 schemaId);
     bool createSchema(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);
     void deleteSchema(const QString& subject, qint32 version);
     void deleteSchema(const QString& subject, bool permanently);
@@ -37,6 +38,7 @@ signals:
     void schemaCreated(qint32 schemaId);
     void failed(QString message);
     void subjectSchemaId(QString subject, qint32 schemaId);
+    void schemaText(QString text);
 
 private:
     QJsonDocument createSchemaJson(const QString& subject, const QByteArray& schema, const QString& schemaType, const QList<Schema>& references);

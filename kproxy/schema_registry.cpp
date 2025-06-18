@@ -11,6 +11,24 @@ SchemaRegistry::SchemaRegistry(QString server, QString user, QString password, b
 }
 
 
+void SchemaRegistry::readSchema(quint32 schemaId) {
+    auto path = QString("schemas/ids/%1").arg(schemaId);
+    mRest.get(requestV3(path), this, [this](QRestReply& reply){
+        if (!reply.isHttpStatusSuccess()) {
+            emit failed(QString("error: %1").arg(reply.httpStatus()));
+            return;
+        }
+	
+	if (auto json = reply.readJson()) {
+	    auto text = json->toJson(QJsonDocument::Indented);
+	    emit schemaText(text);
+	} else {
+	    emit schemaText("Error: Failed to retrieve the schema");
+	}
+    });
+}
+
+
 void SchemaRegistry::getSchemas() {
     mRest.get(requestV3("schemas"), this, [this](QRestReply& reply){
         if (!reply.isHttpStatusSuccess()) {
