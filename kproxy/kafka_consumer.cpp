@@ -38,6 +38,7 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     connect(mProxy.get(), &KafkaProxyV2::receivedJson, this, &KafkaConsumer::receivedJson);
     connect(mProxy.get(), &KafkaProxyV2::receivedBinary, this, &KafkaConsumer::receivedBinary);
     connect(mProxy.get(), &KafkaProxyV2::finished, this, &KafkaConsumer::finished);
+    connect(mProxy.get(), &KafkaProxyV2::failed, this, &KafkaConsumer::failed);
 
 
     connect(mProxy.get(), &KafkaProxyV2::initialized, [this,group](QString instanceId) {
