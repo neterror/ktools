@@ -18,7 +18,6 @@ class KafkaConsumer : public QObject {
 
 private slots:
     void onSuccess();
-    void onFailed();
 public:
     KafkaConsumer(const QString& group, const QStringList& topics, bool verbose, const QString& mediaType);
     void start();
