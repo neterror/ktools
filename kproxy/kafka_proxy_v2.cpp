@@ -143,7 +143,7 @@ void KafkaProxyV2::getRecords() {
                 error += obj["message"].toString();
             }
             debugLog(error);
-            emit failed(error);
+            emit readingComplete();
             return;
         }
 
