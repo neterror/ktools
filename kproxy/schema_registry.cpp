@@ -20,7 +20,7 @@ void SchemaRegistry::readSchema(quint32 schemaId) {
         }
 	
 	if (auto json = reply.readJson()) {
-	    auto text = json->toJson(QJsonDocument::Indented);
+	    auto text = (*json)["schema"].toString();
 	    emit schemaText(text);
 	} else {
 	    emit schemaText("Error: Failed to retrieve the schema");
