@@ -4,6 +4,10 @@
 #include "kafka_proxy_v3.h"
 #include "kafka_proxy_v2.h"
 #include "schema_registry.h"
+#include <qdebug.h>
+#include <qjsonarray.h>
+#include <qjsondocument.h>
+#include <qjsonobject.h>
 #include <qstringliteral.h>
 
 
@@ -14,6 +18,7 @@ KafkaProtobufProducer::KafkaProtobufProducer(bool verbose): mVerbose{verbose}
     auto readSchema = new QState(&mSM);
     auto getClusterId = new QState(&mSM);
     auto waitForData = new QState(&mSM);
+    auto failedSend = new QState(&mSM);
     auto send = new QState(&mSM);
 
     readSchema->addTransition(this, &KafkaProtobufProducer::schemaReady, getClusterId);
@@ -21,12 +26,14 @@ KafkaProtobufProducer::KafkaProtobufProducer(bool verbose): mVerbose{verbose}
 
     waitForData->addTransition(this, &KafkaProtobufProducer::newData, send);
     send->addTransition(mProxy.get(), &HttpClient::messageSent, waitForData);
-    send->addTransition(mProxy.get(), &HttpClient::failed, waitForData);
+    send->addTransition(mProxy.get(), &HttpClient::failed, failedSend);
+    failedSend->addTransition(this, &KafkaProtobufProducer::newData, waitForData);
 
     connect(readSchema,  &QState::entered, this, &KafkaProtobufProducer::onRequestSchema);
     connect(getClusterId, &QState::entered, this, &KafkaProtobufProducer::onRequestClusterId);
     connect(waitForData, &QState::entered, this, &KafkaProtobufProducer::onWaitForData);
     connect(send, &QState::entered, this, &KafkaProtobufProducer::onSend);
+    connect(failedSend, &QState::entered, this, &KafkaProtobufProducer::onFailedSend);
 
     mSM.setInitialState(readSchema);
     mSM.start();
@@ -46,7 +53,6 @@ QString KafkaProtobufProducer::randomId() {
 
 
 void KafkaProtobufProducer::onRequestSchema() {
-    mTopicSchemaId.clear();
     mRegistry->getSchemas();
 }
 
@@ -55,10 +61,21 @@ void KafkaProtobufProducer::onRequestClusterId() {
     mProxy->initialize(randomId());
 }
 
+
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {
+    updateSchemaIds(schemas);
+    if (!mLocalSchemaFile.isEmpty()) {
+	saveLocalSchema(schemas);
+    }
+    emit schemaReady();
+}
+
+
+void KafkaProtobufProducer::updateSchemaIds(const QList<SchemaRegistry::Schema>& schemas) {
     const auto kValueSuffix = QStringLiteral("-value");
     QMap<QString, qint32> schemaVersion;
 
+    mTopicSchemaId.clear();
     for (const auto& schema: schemas) {
         const auto& s = schema.subject;
         if (!s.endsWith(kValueSuffix)) continue;
@@ -71,13 +88,91 @@ void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schem
             schemaVersion[topic] = schema.version;
         }
     }
+}
+
+QList<SchemaRegistry::Schema> KafkaProtobufProducer::loadLocalSchema() {
+    QFile f(mLocalSchemaFile);
+    if (!f.open(QIODevice::ReadOnly)) {
+	qWarning() << "Failed to create" << mLocalSchemaFile;
+	return {};
+    }
+    QList<SchemaRegistry::Schema> result;
+    auto doc = QJsonDocument::fromJson(f.readAll());
+    for (const auto& item: doc.array()) {
+	auto s = item.toObject();
+	SchemaRegistry::Schema schema;
+	schema.schemaId = s["schemaId"].toInt();
+        schema.schema = s["schema"].toString();
+        schema.schemaType = s["schemaType"].toString();
+        schema.subject = s["subject"].toString();
+        schema.version = s["version"].toInt();
+
+	auto references = s["references"].toArray();
+	for (const auto& ref: references) {
+	    auto r = ref.toObject();
+	    SchemaRegistry::Reference reference;
+	    reference.name = r["name"].toString();
+	    reference.subject = r["subject"].toString();
+	    reference.version = r["version"].toInt();
+	 
+	    schema.references.append(reference);
+	}
+	result.append(schema);
+    }
+    return result;
+}
+
+void KafkaProtobufProducer::saveLocalSchema(const QList<SchemaRegistry::Schema>& schemas) {
+    QFile f(mLocalSchemaFile);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+	qWarning() << "Failed to create" << mLocalSchemaFile;
+	return;
+    }
+    QJsonArray array;
+    for (const auto& schema: schemas) {
+	QJsonObject s;
+	s["schemaId"] = schema.schemaId;
+        s["schema"] = schema.schema;
+        s["schemaType"] = schema.schemaType;
+        s["subject"] = schema.subject;
+        s["version"] = schema.version;
+	QJsonArray references;
+	for(const auto& r: schema.references) {
+	    QJsonObject ref;
+	    ref["name"] = r.name;
+	    ref["subject"] = r.subject;
+	    ref["version"] = r.version;
+	    references.append(ref);
+	}
+	s["references"] = references;
+	array.append(s);
+    }
+    QJsonDocument doc(array);
+    auto bytes = doc.toJson();
+    f.write(bytes);
+}
+
+
+void KafkaProtobufProducer::onSchemaReadingFailed(const QString& reason) {
+    qWarning() << "schema reading failed:" << reason;
+    auto schemas = loadLocalSchema();
+    if (!schemas.isEmpty()) {
+	updateSchemaIds(schemas);
+    }
     emit schemaReady();
 }
+
+
 
 void KafkaProtobufProducer::onWaitForData() {
     if (!mQueue.isEmpty()) {
         emit newData();
     }
+}
+
+void KafkaProtobufProducer::onFailedSend() {
+    qWarning() << "message sending has failed";
+    emit newData();
 }
 
 void KafkaProtobufProducer::onSend() {
@@ -138,6 +233,7 @@ void KafkaProtobufProducer::createObjects() {
     auto schemaServer = settings.value("ConfluentSchemaRegistry/server").toString();
     auto schemaUser = settings.value("ConfluentSchemaRegistry/user").toString();
     auto schemaPass = settings.value("ConfluentSchemaRegistry/password").toString();
+    mLocalSchemaFile = settings.value("ConfluentSchemaRegistry/localSchema").toString();
 
     mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mVerbose, kMediaBinary));
     //mProxy.reset(new KafkaProxyV3(proxyServer, proxyUser, proxyPass));
@@ -147,6 +243,7 @@ void KafkaProtobufProducer::createObjects() {
     connect(mProxy.get(), &KafkaProxyV3::messageSent, this, &KafkaProtobufProducer::messageSent);
     connect(mProxy.get(), &KafkaProxyV3::failed, this, &KafkaProtobufProducer::failed);
     connect(mRegistry.get(), &SchemaRegistry::schemaList, this, &KafkaProtobufProducer::onSchemaReceived);
-    
+    connect(mRegistry.get(), &SchemaRegistry::failed, this, &KafkaProtobufProducer::onSchemaReadingFailed);
 }
+
 
