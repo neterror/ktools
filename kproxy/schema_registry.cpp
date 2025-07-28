@@ -11,6 +11,24 @@ SchemaRegistry::SchemaRegistry(QString server, QString user, QString password, b
 }
 
 
+void SchemaRegistry::readSchema(quint32 schemaId) {
+    auto path = QString("schemas/ids/%1").arg(schemaId);
+    mRest.get(requestV3(path), this, [this](QRestReply& reply){
+        if (!reply.isHttpStatusSuccess()) {
+            emit failed(QString("error: %1").arg(reply.httpStatus()));
+            return;
+        }
+	
+	if (auto json = reply.readJson()) {
+	    auto text = (*json)["schema"].toString();
+	    emit schemaText(text);
+	} else {
+	    emit schemaText("Error: Failed to retrieve the schema");
+	}
+    });
+}
+
+
 void SchemaRegistry::getSchemas() {
     mRest.get(requestV3("schemas"), this, [this](QRestReply& reply){
         if (!reply.isHttpStatusSuccess()) {
@@ -131,8 +149,11 @@ void SchemaRegistry::deleteSchema(const QString& subject, qint32 version) {
 
 
 void SchemaRegistry::deleteSchema(const QString& subject, bool permanently) {
-    QString url = QString("subjects/%1").arg(subject);
-    mRest.deleteResource(requestV3(url), this, [this,subject,permanently](QRestReply &reply) {
+    QString encodedSubject = QUrl::toPercentEncoding(subject, QByteArray(), "/");
+    QString url = QString("subjects/%1").arg(encodedSubject);
+    //1. Do a soft delete (as described here): https://docs.confluent.io/platform/current/schema-registry/schema-deletion-guidelines.html#hard-delete-schema
+    qDebug().noquote() << "soft delete:" << url;
+    mRest.deleteResource(requestV3(url), this, [this,encodedSubject,permanently](QRestReply &reply) {
         auto json = reply.readJson();
         if (json && json->isObject()) {
             auto obj = json->object();
@@ -147,9 +168,12 @@ void SchemaRegistry::deleteSchema(const QString& subject, bool permanently) {
             return;
         }
             
+	//2. Now do the hard delete
         //repeat again the deletion, this time with permanent=true
-        QString url = QString("subjects/%1?permanent=true").arg(subject);
-        mRest.deleteResource(requestV3(url), this, [this,subject,permanently](QRestReply &reply) {
+        QString url = QString("subjects/%1?permanent=true").arg(encodedSubject);
+	qDebug().noquote() << "permanent delete:" << url;
+
+        mRest.deleteResource(requestV3(url), this, [this,encodedSubject,permanently](QRestReply &reply) {
             auto json = reply.readJson();
             if (json && json->isObject()) {
                 auto obj = json->object();

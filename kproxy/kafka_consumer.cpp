@@ -10,10 +10,8 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
 
     auto work = new QState(&mSM);
     auto success = new QFinalState(&mSM);
-    auto error = new QFinalState(&mSM);
 
     work->addTransition(this, &KafkaConsumer::stopRequest, success);
-    work->addTransition(this, &KafkaConsumer::failed, error);
 
     auto init = new QState(work);        //request instanceID
     auto subscribe = new QState(work);   //subscribe to the topic
@@ -26,7 +24,6 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     connect(commitOffsets, &QState::entered, [this] {mProxy->commitAllOffsets();});
 
     connect(success,   &QState::entered, this, &KafkaConsumer::onSuccess);
-    connect(error,     &QState::entered, this, &KafkaConsumer::onFailed);
 
     init->addTransition(mProxy.get(), &KafkaProxyV2::initialized, subscribe);
     subscribe->addTransition(mProxy.get(), &KafkaProxyV2::subscribed, read);
@@ -95,16 +92,6 @@ void KafkaConsumer::stop() {
 
 
 void KafkaConsumer::onSuccess() {
-    mProxy->deleteInstanceId();
-    QDir path;
-    auto fileName = instanceBackupFile(mGroupName);
-    if (QFile::exists(fileName)) {
-        qDebug()<< "deleting " << fileName;
-        path.remove(fileName);
-    }
-}
-
-void KafkaConsumer::onFailed() {
     mProxy->deleteInstanceId();
     QDir path;
     auto fileName = instanceBackupFile(mGroupName);

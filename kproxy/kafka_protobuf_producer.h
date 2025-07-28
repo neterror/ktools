@@ -20,12 +20,18 @@ class KafkaProtobufProducer : public QObject {
     QMap<QString, qint32> mTopicSchemaId;
     static QString randomId();
     bool mVerbose;
+    QString mLocalSchemaFile;
+    void saveLocalSchema(const QList<SchemaRegistry::Schema>& schemas);
+    QList<SchemaRegistry::Schema> loadLocalSchema();
+    void updateSchemaIds(const QList<SchemaRegistry::Schema>& schemas);
 private slots:
     void onRequestClusterId();
     void onRequestSchema();
+    void onSchemaReadingFailed(const QString& reason);
     void onSchemaReceived(QList<SchemaRegistry::Schema> schemas);
 
     void onSend();
+    void onFailedSend();
     void onWaitForData();
 public:
     KafkaProtobufProducer(bool verbose);

@@ -84,6 +84,15 @@ void listSchemas(SchemaRegistry& registry) {
     registry.getSchemas();
 }
 
+void readSchema(SchemaRegistry& registry, quint32 schemaId) {
+    QObject::connect(&registry, &SchemaRegistry::schemaText, [](QString text){
+	qDebug().noquote() << text;
+        QCoreApplication::quit();
+    });
+    registry.readSchema(schemaId);
+}
+
+
 void deleteSchemaBySubject(SchemaRegistry& registry, const QString& subject, bool permanent) {
     registry.deleteSchema(subject, permanent);
     QObject::connect(&registry, &SchemaRegistry::schemaDeleted, [subject](bool success){
@@ -133,6 +142,7 @@ int main(int argc, char** argv) {
             {"permanent", "permanent delete flag"},
             {"schemaId", "retrieve the schema id of the specified subject", "subject"},
             {"list", "list registered schemas"},
+            {"read", "read schemaId", "schemaId"},
     });
     parser.process(app);
 
@@ -161,6 +171,12 @@ int main(int argc, char** argv) {
         listSchemas(registry);
         processed = true;
     }
+
+    if (!processed && parser.isSet("read")) {
+        readSchema(registry, parser.value("read").toUInt());
+        processed = true;
+    }
+
 
     if (!processed && parser.isSet("delete")) {
         deleteSchemaBySubject(registry, parser.value("delete"), parser.isSet("permanent"));

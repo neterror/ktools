@@ -56,13 +56,8 @@ void sendBinary(KafkaProxyV3& v3,
 }
 
 
-bool sendProtobuf(const QString& key, const QString& topic, const QString& protofile, bool verbose) {
-    QFile f(protofile);
-    if (!f.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open" << protofile;
-        return false;
-    }
-    auto value = f.readAll();
+bool sendProtobuf(const QString& key, const QString& topic, const QString& base64Value, bool verbose) {
+    auto value = QByteArray::fromBase64(base64Value.toUtf8());
     auto producer = std::make_shared<KafkaProtobufProducer>(verbose);
     QObject::connect(producer.get(), &KafkaProtobufProducer::failed, [](const QString& message){
         qWarning().noquote() << message;
