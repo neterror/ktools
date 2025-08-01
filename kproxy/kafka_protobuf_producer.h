@@ -7,6 +7,7 @@
 #include "http_client.h"
 #include "kafka_messages.h"
 #include "schema_registry.h"
+#include <pqueue/pqueue.h>
 
 class KafkaProtobufProducer : public QObject {
     Q_OBJECT
@@ -14,7 +15,7 @@ class KafkaProtobufProducer : public QObject {
     std::unique_ptr<SchemaRegistry> mRegistry;
 
     QStateMachine mSM;
-    QQueue<OutputBinaryMessage> mQueue;
+    std::unique_ptr<PQueue> mPersistentQueue;
                         
     void createObjects();
     QMap<QString, qint32> mTopicSchemaId;

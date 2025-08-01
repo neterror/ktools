@@ -165,7 +165,7 @@ void KafkaProtobufProducer::onSchemaReadingFailed(const QString& reason) {
 
 
 void KafkaProtobufProducer::onWaitForData() {
-    if (!mQueue.isEmpty()) {
+    if (mPersistentQueue->size()) {
         emit newData();
     }
 }
@@ -176,28 +176,30 @@ void KafkaProtobufProducer::onFailedSend() {
 }
 
 void KafkaProtobufProducer::onSend() {
-    if (mQueue.isEmpty()) {
+    if (!mPersistentQueue->size()) {
         qWarning() << "Empty queue for proxy send!";
         emit error();
         return;
     }
 
     QList<QByteArray> toSend;
-    auto next = mQueue.dequeue();
+    auto group = mPersistentQueue->next();
+    if (group.isEmpty()) {
+        qWarning() << "No data to send in persistent queue group";
+        emit error();
+        return;
+    }
+
+    auto common = group.first();
     qint32 schemaId = -1;
-    auto it = mTopicSchemaId.find(next.topic);
+    auto it = mTopicSchemaId.find(common.topic);
     if (it != mTopicSchemaId.end()) {
         schemaId = *it;
     }
-    toSend << addSchemaRegistryId(schemaId, next.value);
-
-    //all enqueued messages to the same topic have the same schemaId. Send them in batch
-    while ((mQueue.size() > 0) && (mQueue.front().topic == next.topic)) {
-        auto record = mQueue.dequeue();
-        toSend << addSchemaRegistryId(schemaId, record.value);
+    for (const auto& item: group) {
+        toSend << addSchemaRegistryId(schemaId, item.payload);
     }
-
-    mProxy->sendBinary(next.key, next.topic, toSend);
+    mProxy->sendBinary(common.key, common.topic, toSend);
 }
 
 QByteArray KafkaProtobufProducer::addSchemaRegistryId(qint32 schemaId, const QByteArray& input) {
@@ -216,7 +218,7 @@ QByteArray KafkaProtobufProducer::addSchemaRegistryId(qint32 schemaId, const QBy
 }
 
 void KafkaProtobufProducer::send(OutputBinaryMessage data) {
-    mQueue.emplace_back(std::move(data));
+    mPersistentQueue->append(data.topic, data.key, data.value);
     emit newData();
 }
 

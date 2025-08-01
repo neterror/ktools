@@ -302,6 +302,7 @@ void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QL
     auto url = QString("topics/%1").arg(topic);
     mRest.post(requestV2(url, kMediaBinary), QJsonDocument{payload}, this,
                [this](QRestReply &reply) {
+                   qDebug() << "reply:" << reply;
                    debugLog(reply.readText());
                    emit messageSent();
                });
