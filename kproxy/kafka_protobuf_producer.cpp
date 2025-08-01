@@ -1,7 +1,6 @@
 #include "kafka_protobuf_producer.h"
 #include "http_client.h"
 #include "kafka_messages.h"
-#include "kafka_proxy_v3.h"
 #include "kafka_proxy_v2.h"
 #include "schema_registry.h"
 #include <qdebug.h>
@@ -18,23 +17,30 @@ KafkaProtobufProducer::KafkaProtobufProducer(bool verbose): mVerbose{verbose}
     auto readSchema = new QState(&mSM);
     auto getClusterId = new QState(&mSM);
     auto waitForData = new QState(&mSM);
-    auto failedSend = new QState(&mSM);
+    auto sendConfirmed = new QState(&mSM);
+    auto sendFailed = new QState(&mSM);
     auto send = new QState(&mSM);
 
     readSchema->addTransition(this, &KafkaProtobufProducer::schemaReady, getClusterId);
     getClusterId->addTransition(mProxy.get(), &HttpClient::initialized, waitForData);
 
     waitForData->addTransition(this, &KafkaProtobufProducer::newData, send);
-    send->addTransition(mProxy.get(), &HttpClient::messageSent, waitForData);
-    send->addTransition(mProxy.get(), &HttpClient::failed, failedSend);
-    failedSend->addTransition(this, &KafkaProtobufProducer::newData, waitForData);
+
+    send->addTransition(mProxy.get(), &HttpClient::messageSent, sendConfirmed);
+    send->addTransition(mProxy.get(), &HttpClient::failed, sendFailed);
+
+    sendConfirmed->addTransition(this, &KafkaProtobufProducer::newData, waitForData);
+    sendFailed->addTransition(waitForData); //log error and immediately wait for more
+
 
     connect(readSchema,  &QState::entered, this, &KafkaProtobufProducer::onRequestSchema);
     connect(getClusterId, &QState::entered, this, &KafkaProtobufProducer::onRequestClusterId);
     connect(waitForData, &QState::entered, this, &KafkaProtobufProducer::onWaitForData);
     connect(send, &QState::entered, this, &KafkaProtobufProducer::onSend);
-    connect(failedSend, &QState::entered, this, &KafkaProtobufProducer::onFailedSend);
 
+    connect(sendConfirmed, &QState::entered, this, &KafkaProtobufProducer::onSendConfirmed);
+    connect(sendFailed, &QState::entered, this, &KafkaProtobufProducer::onSendFailed);
+    
     mSM.setInitialState(readSchema);
     mSM.start();
 }
@@ -53,21 +59,25 @@ QString KafkaProtobufProducer::randomId() {
 
 
 void KafkaProtobufProducer::onRequestSchema() {
+    qDebug() << "request the schema";
     mRegistry->getSchemas();
 }
 
 
-void KafkaProtobufProducer::onRequestClusterId() {
-    mProxy->initialize(randomId());
-}
-
 
 void KafkaProtobufProducer::onSchemaReceived(QList<SchemaRegistry::Schema> schemas) {
+    qDebug() << "--- onSchemaReceived";
     updateSchemaIds(schemas);
     if (!mLocalSchemaFile.isEmpty()) {
 	saveLocalSchema(schemas);
     }
+    qDebug() << "---- emit schema ready";
     emit schemaReady();
+}
+
+void KafkaProtobufProducer::onRequestClusterId() {
+    qDebug() << "----- schema received. initialize the proxy with customerId";
+    mProxy->initialize(randomId());
 }
 
 
@@ -165,14 +175,10 @@ void KafkaProtobufProducer::onSchemaReadingFailed(const QString& reason) {
 
 
 void KafkaProtobufProducer::onWaitForData() {
+    qDebug() << "KafkaProtobufProducer::onWaitForData. persistent queue size: " << mPersistentQueue->size();
     if (mPersistentQueue->size()) {
         emit newData();
     }
-}
-
-void KafkaProtobufProducer::onFailedSend() {
-    qWarning() << "message sending has failed";
-    emit newData();
 }
 
 void KafkaProtobufProducer::onSend() {
@@ -199,8 +205,21 @@ void KafkaProtobufProducer::onSend() {
     for (const auto& item: group) {
         toSend << addSchemaRegistryId(schemaId, item.payload);
     }
+    qDebug() << "send to" << common.topic;
     mProxy->sendBinary(common.key, common.topic, toSend);
 }
+
+
+void KafkaProtobufProducer::onSendConfirmed() {
+    qDebug() << "Send confirmed";
+    mPersistentQueue->confirm();
+    emit newData();
+}
+
+void KafkaProtobufProducer::onSendFailed() {
+    qWarning() << "message sending has failed";
+}
+
 
 QByteArray KafkaProtobufProducer::addSchemaRegistryId(qint32 schemaId, const QByteArray& input) {
     if (schemaId == -1) return input;
@@ -228,24 +247,25 @@ void KafkaProtobufProducer::stop() {
 
 void KafkaProtobufProducer::createObjects() {
     QSettings settings;
-    auto proxyServer = settings.value("ConfluentRestProxy/server").toString();
-    auto proxyUser = settings.value("ConfluentRestProxy/user").toString();
-    auto proxyPass = settings.value("ConfluentRestProxy/password").toString();
 
     auto schemaServer = settings.value("ConfluentSchemaRegistry/server").toString();
     auto schemaUser = settings.value("ConfluentSchemaRegistry/user").toString();
     auto schemaPass = settings.value("ConfluentSchemaRegistry/password").toString();
     mLocalSchemaFile = settings.value("ConfluentSchemaRegistry/localSchema").toString();
-
-    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mVerbose, kMediaBinary));
-    //mProxy.reset(new KafkaProxyV3(proxyServer, proxyUser, proxyPass));
-
     mRegistry.reset(new SchemaRegistry(schemaServer, schemaUser, schemaPass, mVerbose));
-
-    connect(mProxy.get(), &KafkaProxyV3::messageSent, this, &KafkaProtobufProducer::messageSent);
-    connect(mProxy.get(), &KafkaProxyV3::failed, this, &KafkaProtobufProducer::failed);
     connect(mRegistry.get(), &SchemaRegistry::schemaList, this, &KafkaProtobufProducer::onSchemaReceived);
     connect(mRegistry.get(), &SchemaRegistry::failed, this, &KafkaProtobufProducer::onSchemaReadingFailed);
+
+    auto outboxFile = settings.value("ConfluentRestProxy/outboxFile", "/tmp/kafka.outbox").toString();
+    auto outboxLimit = settings.value("ConfluentRestProxy/outboxLimit", 200000).toInt();
+    auto timeToSave = settings.value("ConfluentRestProxy/timeToSave", 30000).toInt();
+    mPersistentQueue.reset(new PQueue(outboxFile, outboxLimit, timeToSave));
+
+    auto proxyServer = settings.value("ConfluentRestProxy/server").toString();
+    auto proxyUser = settings.value("ConfluentRestProxy/user").toString();
+    auto proxyPass = settings.value("ConfluentRestProxy/password").toString();
+
+    mProxy.reset(new KafkaProxyV2(proxyServer, proxyUser, proxyPass, mVerbose, kMediaBinary));
+    connect(mProxy.get(), &KafkaProxyV2::messageSent, this, &KafkaProtobufProducer::messageSent);
+    connect(mProxy.get(), &KafkaProxyV2::failed, this, &KafkaProtobufProducer::failed);
 }
-
-

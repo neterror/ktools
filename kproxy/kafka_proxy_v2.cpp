@@ -302,9 +302,21 @@ void KafkaProxyV2::sendBinary(const QString& key, const QString& topic, const QL
     auto url = QString("topics/%1").arg(topic);
     mRest.post(requestV2(url, kMediaBinary), QJsonDocument{payload}, this,
                [this](QRestReply &reply) {
-                   qDebug() << "reply:" << reply;
-                   debugLog(reply.readText());
-                   emit messageSent();
+                   bool success = false;
+                   auto json = reply.readJson();
+                   if (json && json->isObject()) {
+                       auto obj = json->object();
+                       if (obj.contains("offsets")) {
+                           success = true;
+                       }
+                   }
+
+                   if (success) {
+                       emit messageSent();
+                   } else {
+                       emit failed("failed to send the message");
+                   }
+                       
                });
 }    
 

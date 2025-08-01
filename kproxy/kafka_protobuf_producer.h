@@ -1,6 +1,4 @@
 #pragma once
-#include <QTimer>
-#include <QElapsedTimer>
 #include <QQueue>
 #include <QObject>
 #include <QtStateMachine/qstatemachine.h>
@@ -18,6 +16,7 @@ class KafkaProtobufProducer : public QObject {
     std::unique_ptr<PQueue> mPersistentQueue;
                         
     void createObjects();
+    
     QMap<QString, qint32> mTopicSchemaId;
     static QString randomId();
     bool mVerbose;
@@ -32,7 +31,8 @@ private slots:
     void onSchemaReceived(QList<SchemaRegistry::Schema> schemas);
 
     void onSend();
-    void onFailedSend();
+    void onSendFailed();
+    void onSendConfirmed();
     void onWaitForData();
 public:
     KafkaProtobufProducer(bool verbose);
