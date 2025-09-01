@@ -8,6 +8,7 @@
 #include <qstringview.h>
 #include <signal.h>
 #include <unistd.h>
+#include "version.h"
 
 static KafkaConsumer* _consumer;
 
@@ -33,6 +34,7 @@ int main(int argc, char** argv) {
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
+    app.setApplicationVersion(APP_VERSION);
 
     parser.addHelpOption();
     parser.addOptions({

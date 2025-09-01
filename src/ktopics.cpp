@@ -5,6 +5,7 @@
 #include <qregularexpression.h>
 #include "kafka_proxy_v3.h"
 #include "topics_delete.h"
+#include "version.h"
 
 void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
     QString formattedRow;
@@ -155,6 +156,7 @@ int main(int argc, char** argv) {
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
+    app.setApplicationVersion(APP_VERSION);
 
     parser.addHelpOption();
     parser.addOptions({

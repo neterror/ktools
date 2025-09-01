@@ -3,6 +3,7 @@
 #include <QtCore>
 #include <qcommandlineoption.h>
 #include <qcoreapplication.h>
+#include "version.h"
 
 void printTableRow(const QStringList &row, const QList<int> &columnWidths) {
     QString formattedRow;
@@ -130,7 +131,7 @@ int main(int argc, char** argv) {
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
-
+    app.setApplicationVersion(APP_VERSION);
 
     parser.addHelpOption();
     parser.addOptions({

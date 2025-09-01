@@ -5,7 +5,7 @@
 #include "kafka_protobuf_producer.h"
 #include "kafka_proxy_v3.h"
 #include "stdin_reader.h"
-
+#include "version.h"
 
 void sendJson(KafkaProxyV3& v3, const QString& key, const QString& topic, const QString& fileName) {
     QFile f(fileName);
@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
 
     app.setOrganizationName("abrites");
     app.setApplicationName("ktools");
+    app.setApplicationVersion(APP_VERSION);
 
     parser.addHelpOption();
     parser.addOptions({

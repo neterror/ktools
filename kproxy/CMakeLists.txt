@@ -26,13 +26,14 @@ add_library(kproxy STATIC
 set_target_properties(kproxy PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Find pqueue package
-find_package(pqueue REQUIRED)
+find_package(pqueue 1.0.0 REQUIRED)
 
 target_include_directories(kproxy PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${HEADER_INSTALL_DIR}>
 )
 target_link_libraries(kproxy PUBLIC Qt6::Core Qt6::Network Qt6::StateMachine pqueue::pqueue)
+  
 
 
 set_target_properties(kproxy PROPERTIES PUBLIC_HEADER "${HEADERS}")
@@ -75,8 +76,8 @@ configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/../kproxyConfig.cmake.in
 
 write_basic_package_version_file(
   ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfigVersion.cmake
-  VERSION 1.0.0
   COMPATIBILITY SameMajorVersion
+  VERSION ${PROJECT_VERSION}
 )
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/kproxyConfig.cmake
