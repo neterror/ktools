@@ -1,0 +1,4 @@
+	## 2.1 - Handle consumer reading problems
+	In kafka_consumer reading state machine, in case of reading error, restart the reading session from the beginning. Obtain new instanceId
+
+	## 2.0 added pqueue

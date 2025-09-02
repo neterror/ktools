@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ktools VERSION 2.0)
+project(ktools VERSION 2.1)
 configure_file(version.h.in version.h @ONLY)
 message(STATUS "Project version: ${PROJECT_VERSION}")
 

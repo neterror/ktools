@@ -40,6 +40,7 @@ signals:
     void receivedJson(InputMessage<QJsonDocument> message);
     void receivedBinary(qint32 schemaId, InputMessage<QByteArray> message);
     void readingComplete();
+    void readingError();
     void oldInstanceDeleted(QString message);
 
     void offsetCommitted();

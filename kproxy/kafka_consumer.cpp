@@ -18,7 +18,10 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     auto read = new QState(work);        //read message
     auto commitOffsets = new QState(work);
 
-    connect(init,          &QState::entered, [this, group] {mProxy->initialize(group);});
+    connect(init,          &QState::entered, [this, group] {
+        qDebug() << "initializing kafka consumer proxy";
+        mProxy->initialize(group);
+    });
     connect(subscribe,     &QState::entered, [this, topics] {mProxy->subscribe(topics);});
     connect(read,          &QState::entered, [this] {mProxy->getRecords();});
     connect(commitOffsets, &QState::entered, [this] {mProxy->commitAllOffsets();});
@@ -28,6 +31,7 @@ KafkaConsumer::KafkaConsumer(const QString& group, const QStringList& topics, bo
     init->addTransition(mProxy.get(), &KafkaProxyV2::initialized, subscribe);
     subscribe->addTransition(mProxy.get(), &KafkaProxyV2::subscribed, read);
     read->addTransition(mProxy.get(), &KafkaProxyV2::readingComplete, commitOffsets);
+    read->addTransition(mProxy.get(), &KafkaProxyV2::readingError, init);
     commitOffsets->addTransition(mProxy.get(), &KafkaProxyV2::offsetCommitted, read);
     
 
